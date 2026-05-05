@@ -1,0 +1,1 @@
+"""StudySync FastAPI backend package."""

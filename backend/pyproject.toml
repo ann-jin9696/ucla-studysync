@@ -1,0 +1,21 @@
+[project]
+name = "studysync-backend"
+version = "0.1.0"
+description = "FastAPI backend for StudySync authentication."
+requires-python = ">=3.11"
+dependencies = [
+    "bcrypt==4.0.1",
+    "fastapi==0.115.6",
+    "httpx==0.28.1",
+    "itsdangerous==2.2.0",
+    "passlib[bcrypt]==1.7.4",
+    "uvicorn[standard]==0.34.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==8.3.4",
+]
+
+[tool.uv]
+package = false
