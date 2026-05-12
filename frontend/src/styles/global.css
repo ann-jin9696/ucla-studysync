@@ -395,6 +395,18 @@ h1 {
   line-height: 1.7;
 }
 
+.matches-section {
+  max-width: 1120px;
+  margin: 0 auto 28px;
+}
+
+.matches-section h2 {
+  margin-bottom: 18px;
+  color: #24483e;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
