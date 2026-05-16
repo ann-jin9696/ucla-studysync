@@ -23,3 +23,34 @@ class UserResponse(BaseModel):
 
 class AuthResponse(BaseModel):
     user: UserResponse
+
+
+class DocumentResponse(BaseModel):
+    id: int
+    workspace_id: int
+    uploader_id: int
+    uploader_name: str
+    title: str
+    file_name: str
+    file_path: str
+    document_type: str
+    uploaded_at: str
+
+
+class WorkspaceDocumentsResponse(BaseModel):
+    workspace_id: int
+    group_id: int
+    documents: list[DocumentResponse]
+
+
+class CommentCreateRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=600)
+
+
+class CommentResponse(BaseModel):
+    id: int
+    document_id: int
+    author_id: int
+    author_name: str
+    content: str
+    created_at: str
