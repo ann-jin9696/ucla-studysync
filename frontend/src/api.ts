@@ -20,16 +20,48 @@ export type LoginInput = {
   password: string;
 };
 
+export type WorkspaceDocument = {
+  id: number;
+  workspace_id: number;
+  uploader_id: number;
+  uploader_name: string;
+  title: string;
+  file_name: string;
+  file_path: string;
+  document_type: string;
+  uploaded_at: string;
+};
+
+export type WorkspaceDocumentsResponse = {
+  workspace_id: number;
+  group_id: number;
+  documents: WorkspaceDocument[];
+};
+
+export type WorkspaceComment = {
+  id: number;
+  document_id: number;
+  author_id: number;
+  author_name: string;
+  content: string;
+  created_at: string;
+};
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const isFormData = options.body instanceof FormData;
+  const headers = isFormData
+    ? options.headers
+    : {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      };
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
     ...options,
+    headers,
   });
 
   if (!response.ok) {
@@ -72,5 +104,46 @@ export const authApi = {
   },
   me() {
     return request<AuthResponse>('/api/auth/me');
+  },
+};
+
+export const workspaceApi = {
+  documentFileUrl(documentId: number) {
+    return `${API_BASE_URL}/api/workspace/documents/${documentId}/file`;
+  },
+  listDocuments(search = '') {
+    const params = new URLSearchParams();
+    if (search.trim()) {
+      params.set('search', search.trim());
+    }
+    const query = params.toString();
+    return request<WorkspaceDocumentsResponse>(
+      `/api/workspace/documents${query ? `?${query}` : ''}`,
+    );
+  },
+  uploadDocument(input: { title: string; document_type: string; file: File }) {
+    const formData = new FormData();
+    formData.append('title', input.title);
+    formData.append('document_type', input.document_type);
+    formData.append('file', input.file);
+
+    return request<WorkspaceDocument>('/api/workspace/documents', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+  listComments(documentId: number) {
+    return request<WorkspaceComment[]>(
+      `/api/workspace/documents/${documentId}/comments`,
+    );
+  },
+  createComment(documentId: number, content: string) {
+    return request<WorkspaceComment>(
+      `/api/workspace/documents/${documentId}/comments`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ content }),
+      },
+    );
   },
 };
