@@ -58,3 +58,16 @@ def test_no_data():
         "preferences": []
     }
     assert get_final_score(user_a, user_b) == 0.0
+
+def test_missing_data():
+    user_a = {
+        "courses": ["CS35L"],
+        "preferences": ["Quiet"]
+    }
+
+    user_b = {
+        "courses": ["CS35L"],
+        "availability": ["M12"],
+    }
+    
+    assert get_final_score(user_a, user_b) == 60.0

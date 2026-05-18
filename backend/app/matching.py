@@ -14,12 +14,12 @@ def calculate_matching_score(user_a, user_b):
 
 def get_final_score(user_a, user_b):
     # Use weights on more important matching criteria
-    
+
     weight_course, weight_availability, weight_preferences = 0.6, 0.3, 0.1
 
-    course_score = calculate_matching_score(user_a["courses"], user_b["courses"])
-    availability_score = calculate_matching_score(user_a["availability"], user_b["availability"])
-    preferences_score = calculate_matching_score(user_a["preferences"], user_b["preferences"])
+    course_score = calculate_matching_score(user_a.get("courses", []), user_b.get("courses", []))
+    availability_score = calculate_matching_score(user_a.get("availability", []), user_b.get("availability", []))
+    preferences_score = calculate_matching_score(user_a.get("preferences", []), user_b.get("preferences", []))
 
     print(f"Course: {weight_course * course_score}")
     print(f"Avail: {weight_availability * availability_score}")
