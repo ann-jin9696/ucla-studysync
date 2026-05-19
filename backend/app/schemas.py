@@ -25,6 +25,19 @@ class AuthResponse(BaseModel):
     user: UserResponse
 
 
+class ProfileResponse(BaseModel):
+    courses: list[str]
+    study_goals: list[str]
+    pace_preference: str | None
+    study_style_preference: str | None
+    group_size_preference: str | None
+    preferred_study_time_tags: list[str]
+    has_basic_profile: bool
+    is_complete: bool
+    created_at: str | None
+    updated_at: str | None
+
+
 class DocumentResponse(BaseModel):
     id: int
     workspace_id: int
