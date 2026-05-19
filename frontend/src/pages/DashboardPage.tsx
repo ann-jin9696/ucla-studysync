@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Card } from 'antd';
+import { Alert, Button, Card } from 'antd';
 import {
   CalendarCheck,
   ChatsCircle,
@@ -9,16 +9,20 @@ import {
 } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/AuthProvider';
+import { useProfile } from '../components/ProfileProvider';
 import {
   WorkspaceModule,
   WorkspaceModuleMode,
 } from '../components/WorkspaceModule';
+import { getMissingProfileSections } from '../profileOptions';
 import studySyncLogo from '../assets/studysync-logo.png';
 
 export function DashboardPage() {
   const { user, logout } = useAuth();
+  const { profile } = useProfile();
   const navigate = useNavigate();
   const [activeModule, setActiveModule] = useState<WorkspaceModuleMode | null>(null);
+  const missingSections = getMissingProfileSections(profile);
 
   async function handleLogout() {
     await logout();
@@ -37,9 +41,12 @@ export function DashboardPage() {
             <strong>Dashboard</strong>
           </div>
         </div>
-        <Button icon={<SignOut size={18} weight="bold" />} onClick={handleLogout}>
-          Logout
-        </Button>
+        <div className="dashboard-actions">
+          <Button onClick={() => navigate('/profile')}>Edit profile</Button>
+          <Button icon={<SignOut size={18} weight="bold" />} onClick={handleLogout}>
+            Logout
+          </Button>
+        </div>
       </nav>
 
       <section className="welcome-band">
@@ -51,11 +58,36 @@ export function DashboardPage() {
         </p>
       </section>
 
+      {profile && !profile.is_complete && (
+        <Alert
+          action={
+            <Button onClick={() => navigate('/profile')} type="primary">
+              Finish profile
+            </Button>
+          }
+          className="profile-reminder dashboard-reminder"
+          description={`Still missing: ${missingSections.join(', ')}.`}
+          message="Finish your profile for better group matches"
+          showIcon
+          type="warning"
+        />
+      )}
+
       <section className="dashboard-grid module-menu" aria-label="Upcoming StudySync modules">
-        <Card>
+        <Card
+          className="module-card"
+          onClick={() => navigate('/profile')}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              navigate('/profile');
+            }
+          }}
+          role="button"
+          tabIndex={0}
+        >
           <UsersThree size={30} weight="duotone" />
           <h2>Profile setup</h2>
-          <p>Add courses, availability, study goals, and collaboration style.</p>
+          <p>Add courses, study goals, pace, and collaboration style.</p>
         </Card>
         <Card>
           <CalendarCheck size={30} weight="duotone" />
