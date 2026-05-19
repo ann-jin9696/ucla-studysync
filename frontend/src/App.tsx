@@ -1,7 +1,9 @@
 import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
+import { ProfileGate } from './components/ProfileGate';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
+import { ProfilePage } from './pages/ProfilePage';
 import { SignupPage } from './pages/SignupPage';
 
 export function App() {
@@ -15,7 +17,27 @@ export function App() {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <DashboardPage />
+              <ProfileGate requireBasicProfile>
+                <DashboardPage />
+              </ProfileGate>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile/setup"
+          element={
+            <ProtectedRoute>
+              <ProfileGate redirectCompleteSetup>
+                <ProfilePage mode="setup" />
+              </ProfileGate>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfilePage mode="edit" />
             </ProtectedRoute>
           }
         />

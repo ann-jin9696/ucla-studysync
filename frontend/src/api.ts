@@ -20,6 +20,28 @@ export type LoginInput = {
   password: string;
 };
 
+export type Profile = {
+  courses: string[];
+  study_goals: string[];
+  pace_preference: string | null;
+  study_style_preference: string | null;
+  group_size_preference: string | null;
+  preferred_study_time_tags: string[];
+  has_basic_profile: boolean;
+  is_complete: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type ProfileInput = {
+  courses: string[];
+  study_goals: string[];
+  pace_preference: string | null;
+  study_style_preference: string | null;
+  group_size_preference: string | null;
+  preferred_study_time_tags: string[];
+};
+
 export type WorkspaceDocument = {
   id: number;
   workspace_id: number;
@@ -104,6 +126,18 @@ export const authApi = {
   },
   me() {
     return request<AuthResponse>('/api/auth/me');
+  },
+};
+
+export const profileApi = {
+  me() {
+    return request<Profile>('/api/profile/me');
+  },
+  update(input: ProfileInput) {
+    return request<Profile>('/api/profile/me', {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    });
   },
 };
 
