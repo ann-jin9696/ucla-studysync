@@ -1,73 +1,70 @@
 import pytest
-from app.matching import get_final_score
+from app.matching import search_rooms
 
-def test_perfect_match():
-    user_a = {
-        "courses": ["CS35L", "MATH131A"],
-        "availability": ["M12", "W14"],
-        "preferences": ["Quiet"]
-    }
-
-    user_b = {
-        "courses": ["CS35L", "MATH131A"],
-        "availability": ["M12", "W14"],
-        "preferences": ["Quiet"]
-    }
-
-    assert get_final_score(user_a, user_b) == 100.0
-
-def test_partial_match():
-    user_a = {
-        "courses": ["CS35L"],
-        "availability": ["W14"],
-        "preferences": ["Quiet"]
-    }
-
-    user_b = {
-        "courses": ["CS35L"],
-        "availability": ["M12"],
+def test_single_room_match():
+    user = {
+        "courses": ["Math131A"],
+        "availability": ["M10", "W10"],
         "preferences": ["Quiet"]
     }
     
-    assert get_final_score(user_a, user_b) == 70.0
+    all_rooms = [
+        {"id": 1, "course": "CS35L", "availability": ["M10"], "preferences": ["Quiet"]},
+        {"id": 2, "course": "Math131A", "availability": ["M10"], "preferences": ["Quiet"]},
+        {"id": 3, "course": "Math116", "availability": ["M10"], "preferences": ["Quiet"]}
+    ]
+    
+    results = search_rooms(user, all_rooms)
+    
+    assert len(results) == 1
+    assert results[0]["course"] == "Math131A"
+    assert results[0]["match_score"] == 65.0
 
-def test_no_match():
-    user_a = {
-        "courses" : ["CS35L"],
-        "availability": ["M10"],
-        "preferences": ["Quiet"]
-    }
-
-    user_b = {
-        "courses" : ["Math116"],
-        "availability": ["W10"],
-        "preferences": ["Coffee Shop"]
-    }
-    assert get_final_score(user_a, user_b) == 0.0
-
-def test_no_data():
-    user_a = {
-        "courses" : [],
-        "availability": [],
-        "preferences": []
-    }
-
-    user_b = {
-        "courses" : [],
-        "availability": [],
-        "preferences": []
-    }
-    assert get_final_score(user_a, user_b) == 0.0
-
-def test_missing_data():
-    user_a = {
+def test_sorting_and_ranking():
+    user = {
         "courses": ["CS35L"],
+        "availability": ["M10", "M11", "M12"],
         "preferences": ["Quiet"]
-    }
-
-    user_b = {
-        "courses": ["CS35L"],
-        "availability": ["M12"],
     }
     
-    assert get_final_score(user_a, user_b) == 60.0
+    all_rooms = [
+        {
+            "id": "bad_schedule", 
+            "course": "CS35L", 
+            "availability": ["M10"],
+            "preferences": ["Quiet"]
+        },
+        {
+            "id": "perfect_schedule", 
+            "course": "CS35L", 
+            "availability": ["M10", "M11", "M12"],
+            "preferences": ["Quiet"]
+        }
+    ]
+    
+    results = search_rooms(user, all_rooms)
+    
+    assert len(results) == 2
+    assert results[0]["id"] == "perfect_schedule"
+    assert results[0]["match_score"] > results[1]["match_score"]
+
+def test_multiple_course_search():
+    user = {"courses": ["CS35L", "Math131A"], "availability": ["M10"], "preferences": ["Quiet"]}
+    all_rooms = [
+        {"id": 1, "course": "CS35L", "availability": ["M10"], "preferences": ["Quiet"]},
+        {"id": 2, "course": "Math131A", "availability": ["M10"], "preferences": ["Quiet"]},
+        {"id": 3, "course": "PHYSICS1A", "availability": ["M10"], "preferences": ["Quiet"]}
+    ]
+    
+    results = search_rooms(user, all_rooms)
+    assert len(results) == 2
+
+    for r in results:
+        assert r["course"] in ["CS35L", "Math131A"]
+
+def test_no_matches_found():
+    user = {"courses": ["CS181"], "availability": ["M10"], "preferences": ["Quiet"]}
+    all_rooms = [{"course": "CS35L"}, {"course": "MATH61"}]
+    
+    results = search_rooms(user, all_rooms)
+    assert results == []

@@ -1,10 +1,12 @@
-def calculate_matching_score(user_a, user_b):
-    # Use Jaccard Similarity to get scores
+def calculate_matching_score(user, study_room):
+    """
+    Use Jaccard Similarity calculations on the sets of strings to get scores
+    """
 
-    set_a, set_b = set(user_a), set(user_b)
+    set_user, set_study_room = set(user), set(study_room)
 
-    intersection = set_a & set_b
-    union = set_a | set_b
+    intersection = set_user & set_study_room
+    union = set_user | set_study_room
 
     if not union:
         return 0.0
@@ -12,19 +14,35 @@ def calculate_matching_score(user_a, user_b):
     score = len(intersection) / len(union)
     return round(score * 100, 2)
 
-def get_final_score(user_a, user_b):
-    # Use weights on more important matching criteria
+def get_final_score(user, study_room):
+    # Filter out rooms that the user doesn't want
+    
+    user_courses = user.get("courses", [])
+    room_course = study_room.get("course")
 
-    weight_course, weight_availability, weight_preferences = 0.6, 0.3, 0.1
+    if room_course not in user_courses:
+        return 0.0
 
-    course_score = calculate_matching_score(user_a.get("courses", []), user_b.get("courses", []))
-    availability_score = calculate_matching_score(user_a.get("availability", []), user_b.get("availability", []))
-    preferences_score = calculate_matching_score(user_a.get("preferences", []), user_b.get("preferences", []))
+    weight_availability, weight_preferences = 0.7, 0.3
 
-    print(f"Course: {weight_course * course_score}")
-    print(f"Avail: {weight_availability * availability_score}")
-    print(f"Pref: {weight_preferences * preferences_score}")
+    availability_score = calculate_matching_score(user.get("availability", []), study_room.get("availability", []))
+    preferences_score = calculate_matching_score(user.get("preferences", []), study_room.get("preferences", []))
 
-    final_score = (weight_course * course_score) + (weight_availability * availability_score) + (weight_preferences * preferences_score)
+    final_score = (weight_availability * availability_score) + (weight_preferences * preferences_score)
 
     return round(final_score, 2)
+
+def search_rooms(user, all_rooms):
+    """
+    Processes all rooms, filters them, and returns sorted list
+    """
+    results = []
+    for room in all_rooms:
+        score = get_final_score(user, room)
+        #only show rooms user wants
+        if score > 0:
+            match_entry = room.copy()
+            match_entry["match_score"] = score
+            results.append(match_entry)
+
+    return sorted(results, key=lambda x: x["match_score"], reverse=True)
