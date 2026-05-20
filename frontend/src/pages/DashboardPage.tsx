@@ -10,9 +10,7 @@ import {
 } from "@phosphor-icons/react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../components/AuthProvider";
-import { MatchCard } from "../components/MatchCard";
 import { ActivityCard } from "../components/ActivityCard";
-import { ac } from "vitest/dist/chunks/reporters.nr4dxCkA.js";
 import { useProfile } from "../components/ProfileProvider";
 import {
   WorkspaceModule,
@@ -29,12 +27,6 @@ export function DashboardPage() {
     null,
   );
   const missingSections = getMissingProfileSections(profile);
-
-  const mockMatches = [
-    { id: 1, name: "Alice", matchedScore: 65, matchedCourse: "CS35L" },
-    { id: 2, name: "Neel", matchedScore: 89, matchedCourse: "Math131A" },
-    { id: 3, name: "Tobias", matchedScore: 96, matchedCourse: "CS35L" },
-  ];
 
   const mockActivity = [
     {
@@ -210,29 +202,6 @@ export function DashboardPage() {
           </div>
         )}
       </section>
-
-      {/*<section className="matches-section">
-        <h2>Your Top Matches</h2>
-        {mockMatches.length > 0 ? (
-          <div>
-            {mockMatches.map((match) => (
-              <MatchCard
-                key={match.id}
-                name={match.name}
-                matchedScore={match.matchedScore}
-                matchedCourse={match.matchedCourse}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state-card">
-            <UsersThree size={48} weight="duotone" />
-            <h3>No matches yet!</h3>
-            <p>Complete your profile, to find your study groups!</p>
-            <Button type="primary">Finish Profile</Button>
-          </div>
-        )}
-      </section>*/}
 
       {activeModule && <WorkspaceModule mode={activeModule} />}
     </main>
