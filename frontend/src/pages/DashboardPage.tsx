@@ -115,59 +115,6 @@ export function DashboardPage() {
         />
       )}
 
-      <section className="activity-feed">
-        <h2>Recent Activity</h2>
-        {mockActivity.length > 0 ? (
-          <div>
-            {mockActivity.map((activity) => (
-              <ActivityCard
-                key={activity.id}
-                name={activity.name}
-                action={activity.action}
-                target={activity.target}
-                group={activity.group}
-                time={activity.time}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state-card">
-            <BinocularsIcon size={32} weight="duotone" />
-            <h3>No Recent Activity!</h3>
-            <p>Join a study group to see what your classmates are up to!</p>
-            <Button
-              type="default"
-              style={{ marginTop: "12px", borderRadius: "10px" }}
-            >
-              Find Groups
-            </Button>
-          </div>
-        )}
-      </section>
-
-      <section className="matches-section">
-        <h2>Your Top Matches</h2>
-        {mockMatches.length > 0 ? (
-          <div>
-            {mockMatches.map((match) => (
-              <MatchCard
-                key={match.id}
-                name={match.name}
-                matchedScore={match.matchedScore}
-                matchedCourse={match.matchedCourse}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state-card">
-            <UsersThree size={48} weight="duotone" />
-            <h3>No matches yet!</h3>
-            <p>Complete your profile, to find your study groups!</p>
-            <Button type="primary">Finish Profile</Button>
-          </div>
-        )}
-      </section>
-
       <section
         className="dashboard-grid module-menu"
         aria-label="Upcoming StudySync modules"
@@ -233,6 +180,59 @@ export function DashboardPage() {
           </p>
         </Card>
       </section>
+
+      <section className="activity-feed">
+        <h2>Recent Activity</h2>
+        {mockActivity.length > 0 ? (
+          <div>
+            {mockActivity.map((activity) => (
+              <ActivityCard
+                key={activity.id}
+                name={activity.name}
+                action={activity.action}
+                target={activity.target}
+                group={activity.group}
+                time={activity.time}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state-card">
+            <BinocularsIcon size={32} weight="duotone" />
+            <h3>No Recent Activity!</h3>
+            <p>Join a study group to see what your classmates are up to!</p>
+            <Button
+              type="default"
+              style={{ marginTop: "12px", borderRadius: "10px" }}
+            >
+              Find Groups
+            </Button>
+          </div>
+        )}
+      </section>
+
+      {/*<section className="matches-section">
+        <h2>Your Top Matches</h2>
+        {mockMatches.length > 0 ? (
+          <div>
+            {mockMatches.map((match) => (
+              <MatchCard
+                key={match.id}
+                name={match.name}
+                matchedScore={match.matchedScore}
+                matchedCourse={match.matchedCourse}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state-card">
+            <UsersThree size={48} weight="duotone" />
+            <h3>No matches yet!</h3>
+            <p>Complete your profile, to find your study groups!</p>
+            <Button type="primary">Finish Profile</Button>
+          </div>
+        )}
+      </section>*/}
 
       {activeModule && <WorkspaceModule mode={activeModule} />}
     </main>
