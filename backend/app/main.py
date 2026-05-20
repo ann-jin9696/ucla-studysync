@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .auth import router as auth_router
-from .matching_router import router as matching_router
+from .matching import router as matching_router
 from .db import init_db
 from .profile import router as profile_router
 from .workspace import router as workspace_router
