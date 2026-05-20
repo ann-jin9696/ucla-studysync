@@ -46,7 +46,6 @@ export function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="/dashboard" element={<DashboardPage />}></Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Router>
