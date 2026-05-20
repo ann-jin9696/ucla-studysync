@@ -18,7 +18,7 @@ export function App() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
-        <Route
+        {/*<Route
           path="/dashboard"
           element={
             <ProtectedRoute>
@@ -45,7 +45,7 @@ export function App() {
               <ProfilePage mode="edit" />
             </ProtectedRoute>
           }
-        />
+        />*/}
         <Route path="/dashboard" element={<DashboardPage />}></Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
