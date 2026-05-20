@@ -23,3 +23,47 @@ class UserResponse(BaseModel):
 
 class AuthResponse(BaseModel):
     user: UserResponse
+
+
+class ProfileResponse(BaseModel):
+    courses: list[str]
+    study_goals: list[str]
+    pace_preference: str | None
+    study_style_preference: str | None
+    group_size_preference: str | None
+    preferred_study_time_tags: list[str]
+    has_basic_profile: bool
+    is_complete: bool
+    created_at: str | None
+    updated_at: str | None
+
+
+class DocumentResponse(BaseModel):
+    id: int
+    workspace_id: int
+    uploader_id: int
+    uploader_name: str
+    title: str
+    file_name: str
+    file_path: str
+    document_type: str
+    uploaded_at: str
+
+
+class WorkspaceDocumentsResponse(BaseModel):
+    workspace_id: int
+    group_id: int
+    documents: list[DocumentResponse]
+
+
+class CommentCreateRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=600)
+
+
+class CommentResponse(BaseModel):
+    id: int
+    document_id: int
+    author_id: int
+    author_name: str
+    content: str
+    created_at: str

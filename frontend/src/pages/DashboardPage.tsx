@@ -1,4 +1,5 @@
-import { Button, Card } from "antd";
+import { useState } from "react";
+import { Alert, Button, Card } from "antd";
 import {
   CalendarCheck,
   ChatsCircle,
@@ -10,13 +11,24 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../components/AuthProvider";
 import { MatchCard } from "../components/MatchCard";
-import studySyncLogo from "../assets/studysync-logo.png";
 import { ActivityCard } from "../components/ActivityCard";
 import { ac } from "vitest/dist/chunks/reporters.nr4dxCkA.js";
+import { useProfile } from "../components/ProfileProvider";
+import {
+  WorkspaceModule,
+  WorkspaceModuleMode,
+} from "../components/WorkspaceModule";
+import { getMissingProfileSections } from "../profileOptions";
+import studySyncLogo from "../assets/studysync-logo.png";
 
 export function DashboardPage() {
   const { user, logout } = useAuth();
+  const { profile } = useProfile();
   const navigate = useNavigate();
+  const [activeModule, setActiveModule] = useState<WorkspaceModuleMode | null>(
+    null,
+  );
+  const missingSections = getMissingProfileSections(profile);
 
   const mockMatches = [
     { id: 1, name: "Alice", matchedScore: 65, matchedCourse: "CS35L" },
@@ -68,12 +80,15 @@ export function DashboardPage() {
             <strong>Dashboard</strong>
           </div>
         </div>
-        <Button
-          icon={<SignOut size={18} weight="bold" />}
-          onClick={handleLogout}
-        >
-          Logout
-        </Button>
+        <div className="dashboard-actions">
+          <Button onClick={() => navigate("/profile")}>Edit profile</Button>
+          <Button
+            icon={<SignOut size={18} weight="bold" />}
+            onClick={handleLogout}
+          >
+            Logout
+          </Button>
+        </div>
       </nav>
 
       <section className="welcome-band">
@@ -84,6 +99,21 @@ export function DashboardPage() {
           notes can plug into this dashboard next.
         </p>
       </section>
+
+      {profile && !profile.is_complete && (
+        <Alert
+          action={
+            <Button onClick={() => navigate("/profile")} type="primary">
+              Finish profile
+            </Button>
+          }
+          className="profile-reminder dashboard-reminder"
+          description={`Still missing: ${missingSections.join(", ")}.`}
+          message="Finish your profile for better group matches"
+          showIcon
+          type="warning"
+        />
+      )}
 
       <section className="activity-feed">
         <h2>Recent Activity</h2>
@@ -139,27 +169,63 @@ export function DashboardPage() {
       </section>
 
       <section
-        className="dashboard-grid"
+        className="dashboard-grid module-menu"
         aria-label="Upcoming StudySync modules"
       >
-        <Card>
+        <Card
+          className="module-card"
+          onClick={() => navigate("/profile")}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              navigate("/profile");
+            }
+          }}
+          role="button"
+          tabIndex={0}
+        >
           <UsersThree size={30} weight="duotone" />
           <h2>Profile setup</h2>
-          <p>
-            Add courses, availability, study goals, and collaboration style.
-          </p>
+          <p>Add courses, study goals, pace, and collaboration style.</p>
         </Card>
         <Card>
           <CalendarCheck size={30} weight="duotone" />
           <h2>Group matching</h2>
           <p>Find classmates whose schedules and study habits fit yours.</p>
         </Card>
-        <Card>
+        <Card
+          className={
+            activeModule === "workspace"
+              ? "module-card active-module-card"
+              : "module-card"
+          }
+          onClick={() => setActiveModule("workspace")}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              setActiveModule("workspace");
+            }
+          }}
+          role="button"
+          tabIndex={0}
+        >
           <NotePencil size={30} weight="duotone" />
           <h2>Shared workspace</h2>
           <p>Keep notes, comments, and study materials in one calm place.</p>
         </Card>
-        <Card>
+        <Card
+          className={
+            activeModule === "discussion"
+              ? "module-card active-module-card"
+              : "module-card"
+          }
+          onClick={() => setActiveModule("discussion")}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              setActiveModule("discussion");
+            }
+          }}
+          role="button"
+          tabIndex={0}
+        >
           <ChatsCircle size={30} weight="duotone" />
           <h2>Group discussion</h2>
           <p>
@@ -167,6 +233,8 @@ export function DashboardPage() {
           </p>
         </Card>
       </section>
+
+      {activeModule && <WorkspaceModule mode={activeModule} />}
     </main>
   );
 }

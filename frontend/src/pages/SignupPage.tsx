@@ -22,7 +22,7 @@ export function SignupPage() {
     setSubmitting(true);
     try {
       await signup(values);
-      navigate('/dashboard', { replace: true });
+      navigate('/profile/setup', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to create account.');
     } finally {
@@ -34,7 +34,7 @@ export function SignupPage() {
     <AuthShell
       eyebrow="Start with your UCLA email"
       title="Make study feel a little brighter."
-      subtitle="Create your StudySync account now, then build the rest of your profile when the next module is ready."
+      subtitle="Create your StudySync account now, then add your current courses to unlock your dashboard."
       switchPrompt="Already have an account?"
       switchLabel="Log in"
       switchTo="/login"
