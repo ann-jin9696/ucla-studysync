@@ -64,6 +64,37 @@ def init_db() -> None:
             )
             """
         )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS groups(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                course TEXT NOT NULL,
+                study_goals TEXT NOT NULL DEFAULT '[]',
+                group_size TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS group_member (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                group_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                role TEXT NOT NULL DEFAULT 'member',
+                joined_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE (group_id, user_id)
+            )
+            """
+        )
+
+
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS documents (
