@@ -410,6 +410,102 @@ h1 {
   line-height: 1.7;
 }
 
+.matches-section {
+  max-width: 1120px;
+  margin: 0 auto 28px;
+}
+
+.matches-section h2 {
+  margin-bottom: 18px;
+  color: #24483e;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+/* --- ACTIVITY FEED SECTION --- */
+.activity-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.activity-card {
+  border-radius: 20px !important; /* Overriding Ant Design default */
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  background: rgba(255, 255, 255, 0.4) !important;
+  transition: all 0.2s ease;
+}
+
+.activity-card:hover {
+  background: rgba(255, 255, 255, 0.8) !important;
+  transform: translateX(4px); /* Subtle slide-in effect */
+}
+
+.activity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 4px;
+}
+
+.activity-name {
+  font-weight: 700;
+  color: #274c42;
+  margin: 0;
+}
+
+.activity-time {
+  font-size: 0.75rem;
+  color: #8da39b;
+}
+
+.activity-action-text {
+  font-size: 0.9rem;
+  color: #5c756c;
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+
+.activity-target-bold {
+  color: #3b9f89;
+  font-weight: 600;
+}
+
+.activity-tag {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #5d7f73;
+  background: rgba(121, 207, 183, 0.15);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+.empty-state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.3);
+  border: 2px dashed rgba(121, 207, 183, 0.5); /* Dashed border signals "empty slot" */
+  border-radius: 30px;
+  color: #5d7f73;
+}
+
+.empty-state-card svg {
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+
+.empty-state-card h3 {
+  margin-bottom: 8px;
+  color: #274c42;
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
