@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Alert, Button, Card } from 'antd';
+import { useEffect, useState } from 'react';
+import { Alert, Button, Card, Progress } from 'antd';
 import {
   CalendarCheck,
+  ClockCounterClockwise,
   ChatsCircle,
   NotePencil,
   SignOut,
@@ -16,14 +17,54 @@ import {
 } from '../components/WorkspaceModule';
 import { getMissingProfileSections } from '../profileOptions';
 import studySyncLogo from '../assets/studysync-logo.png';
+import { matchingApi } from '../api';
+import type { ActivityItem, MatchResult } from '../api';
 
 export function DashboardPage() {
   const { user, logout } = useAuth();
   const { profile } = useProfile();
   const navigate = useNavigate();
   const [activeModule, setActiveModule] = useState<WorkspaceModuleMode | null>(null);
+  const [matchResults, setMatchResults] = useState<MatchResult[]>([]);
+  const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
   const missingSections = getMissingProfileSections(profile);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadDashboardData() {
+      try {
+        const [results, activity] = await Promise.all([
+          matchingApi.listResults(),
+          matchingApi.listActivity(),
+        ]);
+
+        if (isMounted) {
+          setMatchResults(results);
+          setActivityItems(activity);
+          setDashboardError(null);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setDashboardError(
+            err instanceof Error ? err.message : 'Could not load dashboard data.',
+          );
+        }
+      }
+    }
+
+    void loadDashboardData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+
+
+
+  
   async function handleLogout() {
     await logout();
     navigate('/login', { replace: true });
@@ -131,6 +172,80 @@ export function DashboardPage() {
           <p>Leave questions and comments beside the notes your group shares.</p>
         </Card>
       </section>
+
+      {dashboardError && (
+        <Alert
+          className="dashboard-reminder"
+          message="Dashboard data could not load"
+          description={dashboardError}
+          showIcon
+          type="info"
+        />
+      )}
+
+      <section className="matching-dashboard-panel" aria-label="Matching and activity feed">
+        <Card className="matching-results-card">
+          <div className="section-heading-row">
+            <div>
+              <p className="eyebrow">MatchResult</p>
+              <h2>Best group matches</h2>
+            </div>
+            <CalendarCheck size={28} weight="duotone" />
+          </div>
+
+          <div className="match-result-list">
+            {matchResults.map((result) => (
+              <article className="match-result-item" key={result.matchedCourse}>
+                <div>
+                  <strong>{result.matchedCourse}</strong>
+                  <p>{result.matchedSchedule}</p>
+                  <span>{result.matchedPreference}</span>
+                </div>
+                <Progress percent={result.matchScore} size="small" status="active" />
+              </article>
+            ))}
+
+            {matchResults.length === 0 && (
+              <p className="empty-dashboard-note">
+                Add courses and preferences to see match results here.
+              </p>
+            )}
+          </div>
+        </Card>
+          
+        <Card className="activity-feed-card">
+          <div className="section-heading-row">
+            <div>
+              <p className="eyebrow">ActivityItem</p>
+              <h2>Recent activity</h2>
+            </div>
+            <ClockCounterClockwise size={28} weight="duotone" />
+          </div>
+          
+          <div className="activity-feed-list">
+            {activityItems.map((item) => (
+              <article className="activity-feed-item" key={item.activityId}>
+                <span>{item.activityType.replace('_', ' ')}</span>
+                <p>{item.description}</p>
+                <time dateTime={item.timestamp}>
+                  {new Date(item.timestamp).toLocaleString()}
+                </time>
+              </article>
+            ))}
+
+            {activityItems.length === 0 && (
+              <p className="empty-dashboard-note">No recent activity yet.</p>
+            )}
+          </div>
+        </Card>
+      </section>
+
+
+
+
+
+
+
 
       {activeModule && <WorkspaceModule mode={activeModule} />}
     </main>

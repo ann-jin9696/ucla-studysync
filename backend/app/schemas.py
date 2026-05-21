@@ -67,3 +67,17 @@ class CommentResponse(BaseModel):
     author_name: str
     content: str
     created_at: str
+
+
+class MatchResultResponse(BaseModel):
+    matchScore: int
+    matchedCourse: str
+    matchedSchedule: str
+    matchedPreference: str
+
+
+class ActivityItemResponse(BaseModel):
+    activityId: int
+    activityType: str
+    timestamp: str
+    description: str

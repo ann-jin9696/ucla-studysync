@@ -60,6 +60,20 @@ export type WorkspaceDocumentsResponse = {
   documents: WorkspaceDocument[];
 };
 
+export type MatchResult = {
+  matchScore: number;
+  matchedCourse: string;
+  matchedSchedule: string;
+  matchedPreference: string;
+};
+
+export type ActivityItem = {
+  activityId: number;
+  activityType: string;
+  timestamp: string;
+  description: string;
+};
+
 export type WorkspaceComment = {
   id: number;
   document_id: number;
@@ -179,5 +193,15 @@ export const workspaceApi = {
         body: JSON.stringify({ content }),
       },
     );
+  },
+};
+
+
+export const matchingApi = {
+  listResults() {
+    return request<MatchResult[]>('/api/matching/results');
+  },
+  listActivity() {
+    return request<ActivityItem[]>('/api/matching/activity');
   },
 };
