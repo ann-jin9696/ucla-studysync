@@ -1,10 +1,15 @@
-import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
-import { ProfileGate } from './components/ProfileGate';
-import { ProtectedRoute } from './components/ProtectedRoute';
-import { DashboardPage } from './pages/DashboardPage';
-import { LoginPage } from './pages/LoginPage';
-import { ProfilePage } from './pages/ProfilePage';
-import { SignupPage } from './pages/SignupPage';
+import {
+  Navigate,
+  Route,
+  BrowserRouter as Router,
+  Routes,
+} from "react-router-dom";
+import { ProfileGate } from "./components/ProfileGate";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { DashboardPage } from "./pages/DashboardPage";
+import { LoginPage } from "./pages/LoginPage";
+import { ProfilePage } from "./pages/ProfilePage";
+import { SignupPage } from "./pages/SignupPage";
 
 export function App() {
   return (
