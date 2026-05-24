@@ -40,14 +40,14 @@ class ProfileResponse(BaseModel):
 class createGroupRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     course: str = Field(min_length=1, max_length=100)
-    study_goals: list[str] 
-    group_size: str
 
 class GroupResponse(BaseModel):
     id: int
     name: str
     course: str
-    study_goals: list[str]
+    course_time: str
+    study_pace: str
+    study_goal: str
     group_size: str
     member_count: int
     created_at: str
@@ -56,7 +56,6 @@ class GroupResponse(BaseModel):
 class GroupMemberResponse(BaseModel):
     user_id: int
     full_name: str
-    role: str
     joined_at: str
 
 class DocumentResponse(BaseModel):

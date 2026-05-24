@@ -71,11 +71,12 @@ def init_db() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 course TEXT NOT NULL,
-                study_goals TEXT NOT NULL DEFAULT '[]',
+                course_time TEXT NOT NULL,
+                study_pace TEXT NOT NULL,
+                study_goal TEXT NOT NULL,
                 group_size TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
-
             """
         )
 
@@ -85,7 +86,6 @@ def init_db() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 group_id INTEGER NOT NULL,
                 user_id INTEGER NOT NULL,
-                role TEXT NOT NULL DEFAULT 'member',
                 joined_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,

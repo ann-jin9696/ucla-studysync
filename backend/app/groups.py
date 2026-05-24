@@ -37,7 +37,6 @@ def serialize_member(row: sqlite3.Row) -> GroupMemberResponse:
     return GroupMemberResponse(
         user_id=row["user_id"],
         full_name=row["full_name"],
-        role=row["role"],
         joined_at=row["joined_at"],
     )
 
