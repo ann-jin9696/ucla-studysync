@@ -67,6 +67,7 @@ export function DashboardPage() {
   const [activities, setActivities] = useState<GroupActivity[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(true);
   const [activityError, setActivityError] = useState<string | null>(null);
+  const [activityExpanded, setActivityExpanded] = useState(false);
   const missingSections = getMissingProfileSections(profile);
 
   const loadActivities = useCallback(async () => {
@@ -183,7 +184,7 @@ export function DashboardPage() {
         <Spin spinning={loadingActivities}>
           {activities.length > 0 ? (
             <div>
-              {activities.map((activity) => (
+              {(activityExpanded ? activities : activities.slice(0, 3)).map((activity) => (
                 <ActivityCard
                   key={activity.id}
                   name={activity.actor_name}
@@ -194,6 +195,14 @@ export function DashboardPage() {
                   onView={() => viewActivity(activity)}
                 />
               ))}
+              {activities.length > 3 && (
+                <Button
+                  type="link"
+                  onClick={() => setActivityExpanded((prev) => !prev)}
+                >
+                  {activityExpanded ? "Show less" : `Show all ${activities.length}`}
+                </Button>
+              )}
             </div>
           ) : (
             <div className="empty-state-card">
