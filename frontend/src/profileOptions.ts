@@ -2,11 +2,6 @@ import type { Profile } from './api';
 
 export const EMPTY_PROFILE: Profile = {
   courses: [],
-  study_goals: [],
-  pace_preference: null,
-  study_style_preference: null,
-  group_size_preference: null,
-  preferred_study_time_tags: [],
   has_basic_profile: false,
   is_complete: false,
   created_at: null,
@@ -27,44 +22,35 @@ export const PACE_OPTIONS = [
   { label: 'Intensive', value: 'intensive' },
 ];
 
-export const STUDY_STYLE_OPTIONS = [
-  { label: 'Quiet parallel work', value: 'quiet_parallel' },
-  { label: 'Discussion based', value: 'discussion_based' },
-  { label: 'Problem solving', value: 'problem_solving' },
-  { label: 'Teaching each other', value: 'teaching_each_other' },
-];
+const TERMS = ['Winter', 'Spring', 'Summer', 'Fall'];
 
-export const GROUP_SIZE_OPTIONS = [
-  { label: 'Pair', value: 'pair' },
-  { label: 'Small group', value: 'small_group' },
-  { label: 'Large group', value: 'large_group' },
-  { label: 'No preference', value: 'no_preference' },
-];
+export function getCourseQuarterOptions(currentDate = new Date()) {
+  const finalYear = currentDate.getFullYear() + 2;
+  const options = [];
+  for (let year = 2026; year <= finalYear; year += 1) {
+    for (const term of TERMS) {
+      if (year === 2026 && TERMS.indexOf(term) < TERMS.indexOf('Spring')) {
+        continue;
+      }
+      options.push({ label: `${term} ${year}`, value: `${term} ${year}` });
+    }
+  }
+  return options;
+}
 
-export const PREFERRED_STUDY_TIME_OPTIONS = [
-  { label: 'Weekday mornings', value: 'weekday_mornings' },
-  { label: 'Weekday afternoons', value: 'weekday_afternoons' },
-  { label: 'Weekday evenings', value: 'weekday_evenings' },
-  { label: 'Weekend mornings', value: 'weekend_mornings' },
-  { label: 'Weekend afternoons', value: 'weekend_afternoons' },
-  { label: 'Weekend evenings', value: 'weekend_evenings' },
-  { label: 'Late nights', value: 'late_nights' },
-  { label: 'Flexible', value: 'flexible' },
-];
+export const COURSE_QUARTER_OPTIONS = getCourseQuarterOptions();
 
 export function getMissingProfileSections(profile: Profile | null) {
   const missingSections = [];
   if (!profile?.courses.length) {
     missingSections.push('courses');
+    return missingSections;
   }
-  if (!profile?.study_goals.length) {
+  if (profile.courses.some((course) => course.study_goals.length === 0)) {
     missingSections.push('study goals');
   }
-  if (!profile?.pace_preference) {
+  if (profile.courses.some((course) => !course.pace_preference)) {
     missingSections.push('pace preference');
-  }
-  if (!profile?.study_style_preference) {
-    missingSections.push('study style preference');
   }
   return missingSections;
 }

@@ -1,0 +1,228 @@
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { ConfigProvider } from 'antd';
+import type { ComponentProps } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { groupApi } from '../api';
+import { WorkspaceModule } from './WorkspaceModule';
+
+const apiMocks = vi.hoisted(() => ({
+  createComment: vi.fn(),
+  documentFileUrl: vi.fn(() => ''),
+  getDetail: vi.fn(),
+  listComments: vi.fn(),
+  listDocuments: vi.fn(),
+  listMyGroups: vi.fn(),
+  uploadDocument: vi.fn(),
+}));
+
+vi.mock('../api', () => ({
+  groupApi: apiMocks,
+}));
+
+const alphaGroup = {
+  id: 1,
+  name: 'Alpha Group',
+  course_id: 1,
+  course_code: 'CS35L',
+  course_quarter: 'Spring 2026',
+  lecture_number: 1,
+  created_by_user_id: 1,
+  member_count: 3,
+  created_at: '2026-05-23 20:00:00',
+  updated_at: '2026-05-23 20:00:00',
+};
+
+const betaGroup = {
+  ...alphaGroup,
+  id: 2,
+  name: 'Beta Group',
+};
+
+const documentsByGroup = {
+  1: [
+    {
+      id: 10,
+      group_id: 1,
+      uploader_id: 1,
+      uploader_name: 'Ann',
+      title: 'Alpha Notes',
+      file_name: 'alpha-notes.pdf',
+      file_path: 'uploads/group-1/alpha-notes.pdf',
+      document_type: 'notes',
+      uploaded_at: '2026-05-23 20:00:00',
+    },
+  ],
+  2: [
+    {
+      id: 20,
+      group_id: 2,
+      uploader_id: 2,
+      uploader_name: 'Audrey',
+      title: 'Beta Guide',
+      file_name: 'beta-guide.pdf',
+      file_path: 'uploads/group-2/beta-guide.pdf',
+      document_type: 'review',
+      uploaded_at: '2026-05-23 20:05:00',
+    },
+  ],
+};
+
+const commentsByDocument = {
+  10: [
+    {
+      id: 100,
+      document_id: 10,
+      author_id: 1,
+      author_name: 'Ann',
+      content: 'Alpha follow-up note.',
+      created_at: '2026-05-23 20:10:00',
+    },
+  ],
+  20: [
+    {
+      id: 300,
+      document_id: 20,
+      author_id: 2,
+      author_name: 'Audrey',
+      content: 'This is the exact comment to revisit.',
+      created_at: '2026-05-23 20:15:00',
+    },
+  ],
+};
+
+const betaGroupDetail = {
+  ...betaGroup,
+  owner_name: 'Ann',
+  top_study_goals: [
+    { value: 'project_work', count: 2 },
+    { value: 'exam_prep', count: 1 },
+  ],
+  average_pace_preference: 'moderate',
+  average_pace_score: 2,
+  group_size_bucket: 'small',
+  members: [
+    {
+      user_id: 1,
+      full_name: 'Ann',
+      is_owner: true,
+      study_goals: ['project_work'],
+      pace_preference: 'moderate',
+      group_size_preference: 4,
+      joined_at: '2026-05-23 20:00:00',
+    },
+    {
+      user_id: 2,
+      full_name: 'Audrey',
+      is_owner: false,
+      study_goals: ['project_work', 'exam_prep'],
+      pace_preference: 'moderate',
+      group_size_preference: 4,
+      joined_at: '2026-05-23 20:05:00',
+    },
+  ],
+};
+
+const scrollIntoViewMock = vi.fn();
+
+function renderWorkspace(props: Partial<ComponentProps<typeof WorkspaceModule>> = {}) {
+  return render(
+    <ConfigProvider>
+      <WorkspaceModule mode="workspace" {...props} />
+    </ConfigProvider>,
+  );
+}
+
+describe('WorkspaceModule', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoViewMock,
+    });
+    vi.spyOn(window, 'getComputedStyle').mockImplementation(
+      () =>
+        ({
+          getPropertyValue: () => '',
+        }) as unknown as CSSStyleDeclaration,
+    );
+    vi.mocked(groupApi.listMyGroups).mockResolvedValue([alphaGroup, betaGroup]);
+    vi.mocked(groupApi.listDocuments).mockImplementation(async (groupId: number) => ({
+      group_id: groupId,
+      documents: documentsByGroup[groupId as 1 | 2],
+    }));
+    vi.mocked(groupApi.listComments).mockImplementation(
+      async (_groupId: number, documentId: number) =>
+        commentsByDocument[documentId as 10 | 20] ?? [],
+    );
+    vi.mocked(groupApi.getDetail).mockResolvedValue(betaGroupDetail);
+  });
+
+  it('lets a user switch between multiple group workspaces', async () => {
+    const user = userEvent.setup();
+
+    renderWorkspace();
+
+    expect(await screen.findByText('Alpha Notes')).toBeInTheDocument();
+    expect(groupApi.listDocuments).toHaveBeenCalledWith(1, '');
+
+    await user.click(
+      screen.getByRole('button', { name: 'Beta Group CS35L Spring 2026 Lec 1' }),
+    );
+
+    expect(await screen.findByText('Beta Guide')).toBeInTheDocument();
+    expect(screen.queryByText('Alpha Notes')).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(groupApi.listDocuments).toHaveBeenLastCalledWith(2, '');
+    });
+  });
+
+  it('scrolls and highlights a document opened from recent activity', async () => {
+    renderWorkspace({
+      initialGroupId: 2,
+      initialDocumentId: 20,
+      focusActivityId: 'document-20',
+      focusRequestId: 1,
+    });
+
+    const documentRow = await screen.findByRole('button', { name: /Beta Guide/ });
+
+    expect(documentRow).toHaveClass('focused-activity');
+    await waitFor(() => {
+      expect(scrollIntoViewMock).toHaveBeenCalled();
+    });
+  });
+
+  it('scrolls and highlights a comment opened from recent activity', async () => {
+    renderWorkspace({
+      mode: 'discussion',
+      initialGroupId: 2,
+      initialDocumentId: 20,
+      focusActivityId: 'comment-300',
+      focusRequestId: 1,
+    });
+
+    const commentText = await screen.findByText('This is the exact comment to revisit.');
+    const commentItem = commentText.closest('.comment-item');
+
+    expect(commentItem).toHaveClass('focused-activity');
+    await waitFor(() => {
+      expect(scrollIntoViewMock).toHaveBeenCalled();
+    });
+  });
+
+  it('opens details for the selected group workspace', async () => {
+    const user = userEvent.setup();
+
+    renderWorkspace({ initialGroupId: 2 });
+
+    await screen.findByText('Beta Guide');
+    await user.click(screen.getByRole('button', { name: 'Group info' }));
+
+    expect(await screen.findByText('Group properties')).toBeInTheDocument();
+    expect(screen.getAllByText('Ann').length).toBeGreaterThan(0);
+    expect(screen.getByText('Audrey')).toBeInTheDocument();
+    expect(groupApi.getDetail).toHaveBeenCalledWith(2);
+  });
+});

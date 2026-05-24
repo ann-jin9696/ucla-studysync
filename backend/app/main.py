@@ -6,10 +6,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .auth import router as auth_router
+from .groups import router as groups_router
 from .matching import router as matching_router
 from .db import init_db
 from .profile import router as profile_router
-from .workspace import router as workspace_router
 
 
 @asynccontextmanager
@@ -29,9 +29,9 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(groups_router)
 app.include_router(matching_router)
 app.include_router(profile_router)
-app.include_router(workspace_router)
 
 
 @app.get("/api/health")
