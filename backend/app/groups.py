@@ -545,17 +545,19 @@ def apply_to_group(
 
     active_request = db.execute(
         """
-        SELECT id
+        SELECT join_requests.id
         FROM join_requests
-        WHERE user_id = ?
-          AND status = 'pending'
+        JOIN groups ON groups.id = join_requests.group_id
+        WHERE join_requests.user_id = ?
+          AND join_requests.status = 'pending'
+          AND groups.course_id = ?
         """,
-        (user_id,),
+        (user_id, int(group["course_id"])),
     ).fetchone()
     if active_request is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="You already have a pending group application.",
+            detail="You already have a pending group application for this course.",
         )
 
     try:
