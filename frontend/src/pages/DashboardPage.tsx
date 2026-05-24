@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Alert, Button, Card } from "antd";
+import { type KeyboardEvent, useCallback, useEffect, useState } from "react";
+import { Alert, Button, Card, Spin } from "antd";
 import {
   CalendarCheck,
   ChatsCircle,
@@ -11,54 +11,118 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../components/AuthProvider";
 import { ActivityCard } from "../components/ActivityCard";
+import { GroupMatchingModule } from "../components/GroupMatchingModule";
+import { ProfileSetupModule } from "../components/ProfileSetupModule";
 import { useProfile } from "../components/ProfileProvider";
 import {
   WorkspaceModule,
   WorkspaceModuleMode,
 } from "../components/WorkspaceModule";
+import { groupApi, type GroupActivity } from "../api";
+import { parseApiTimestamp } from "../dateTime";
 import { getMissingProfileSections } from "../profileOptions";
 import studySyncLogo from "../assets/studysync-logo.png";
+
+type DashboardModuleMode = "profile" | "matching" | WorkspaceModuleMode;
+type WorkspaceTarget = {
+  groupId: number;
+  documentId: number;
+  activityId: string;
+  requestId: number;
+};
+
+function activityAction(activity: GroupActivity) {
+  return activity.activity_type === "comment_added" ? "Commented on" : "Uploaded";
+}
+
+function formatRelativeTime(value: string) {
+  const deltaSeconds = Math.round((parseApiTimestamp(value).getTime() - Date.now()) / 1000);
+  const units: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+    ["year", 60 * 60 * 24 * 365],
+    ["month", 60 * 60 * 24 * 30],
+    ["week", 60 * 60 * 24 * 7],
+    ["day", 60 * 60 * 24],
+    ["hour", 60 * 60],
+    ["minute", 60],
+  ];
+  const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+
+  for (const [unit, secondsPerUnit] of units) {
+    if (Math.abs(deltaSeconds) >= secondsPerUnit) {
+      return formatter.format(Math.round(deltaSeconds / secondsPerUnit), unit);
+    }
+  }
+
+  return "just now";
+}
 
 export function DashboardPage() {
   const { user, logout } = useAuth();
   const { profile } = useProfile();
   const navigate = useNavigate();
-  const [activeModule, setActiveModule] = useState<WorkspaceModuleMode | null>(
+  const [activeModule, setActiveModule] = useState<DashboardModuleMode | null>(
     null,
   );
+  const [workspaceTarget, setWorkspaceTarget] = useState<WorkspaceTarget | null>(null);
+  const [activities, setActivities] = useState<GroupActivity[]>([]);
+  const [loadingActivities, setLoadingActivities] = useState(true);
+  const [activityError, setActivityError] = useState<string | null>(null);
   const missingSections = getMissingProfileSections(profile);
 
-  const mockActivity = [
-    {
-      id: 1,
-      name: "Alice",
-      action: "Uploaded",
-      target: "Midterm Review Notes",
-      group: "CS35L",
-      time: "1 hour ago",
-    },
-    {
-      id: 2,
-      name: "Neel",
-      action: "Commented on",
-      target: "HW2.pdf",
-      group: "Math115A",
-      time: "5 minutes ago",
-    },
-    {
-      id: 3,
-      name: "Tobias",
-      action: "Said",
-      target: "Are we free tomorrow?",
-      group: "CS35L",
-      time: "1 day ago",
-    },
-  ];
+  const loadActivities = useCallback(async () => {
+    setLoadingActivities(true);
+    setActivityError(null);
+    try {
+      setActivities(await groupApi.listActivity());
+    } catch (error) {
+      setActivityError(
+        error instanceof Error ? error.message : "Could not load recent activity.",
+      );
+    } finally {
+      setLoadingActivities(false);
+    }
+  }, []);
 
   async function handleLogout() {
     await logout();
     navigate("/login", { replace: true });
   }
+
+  function moduleCardClass(moduleName: DashboardModuleMode) {
+    return activeModule === moduleName
+      ? "module-card active-module-card"
+      : "module-card";
+  }
+
+  function handleModuleKeyDown(
+    event: KeyboardEvent,
+    moduleName: DashboardModuleMode,
+  ) {
+    if (event.key === "Enter" || event.key === " ") {
+      selectModule(moduleName);
+    }
+  }
+
+  function selectModule(moduleName: DashboardModuleMode) {
+    setWorkspaceTarget(null);
+    setActiveModule(moduleName);
+  }
+
+  function viewActivity(activity: GroupActivity) {
+    setWorkspaceTarget((currentTarget) => ({
+      groupId: activity.group_id,
+      documentId: activity.document_id,
+      activityId: activity.id,
+      requestId: (currentTarget?.requestId ?? 0) + 1,
+    }));
+    setActiveModule(
+      activity.activity_type === "comment_added" ? "discussion" : "workspace",
+    );
+  }
+
+  useEffect(() => {
+    void loadActivities();
+  }, [loadActivities]);
 
   return (
     <main className="dashboard-page">
@@ -73,7 +137,6 @@ export function DashboardPage() {
           </div>
         </div>
         <div className="dashboard-actions">
-          <Button onClick={() => navigate("/profile")}>Edit profile</Button>
           <Button
             icon={<SignOut size={18} weight="bold" />}
             onClick={handleLogout}
@@ -95,7 +158,7 @@ export function DashboardPage() {
       {profile && !profile.is_complete && (
         <Alert
           action={
-            <Button onClick={() => navigate("/profile")} type="primary">
+            <Button onClick={() => selectModule("profile")} type="primary">
               Finish profile
             </Button>
           }
@@ -107,61 +170,93 @@ export function DashboardPage() {
         />
       )}
 
+      <section className="activity-feed">
+        <h2>Recent Activity</h2>
+        {activityError && (
+          <Alert
+            className="dashboard-reminder"
+            message={activityError}
+            showIcon
+            type="warning"
+          />
+        )}
+        <Spin spinning={loadingActivities}>
+          {activities.length > 0 ? (
+            <div>
+              {activities.map((activity) => (
+                <ActivityCard
+                  key={activity.id}
+                  name={activity.actor_name}
+                  action={activityAction(activity)}
+                  target={activity.document_title}
+                  group={`${activity.group_name} · ${activity.course_code}`}
+                  time={formatRelativeTime(activity.occurred_at)}
+                  onView={() => viewActivity(activity)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state-card">
+              <BinocularsIcon size={32} weight="duotone" />
+              <h3>No recent activity</h3>
+              <p>Join or create a group to see shared files and comments here.</p>
+              <Button
+                onClick={() => selectModule("matching")}
+                type="default"
+                style={{ marginTop: "12px", borderRadius: "10px" }}
+              >
+                Find Groups
+              </Button>
+            </div>
+          )}
+        </Spin>
+      </section>
+
       <section
         className="dashboard-grid module-menu"
         aria-label="Upcoming StudySync modules"
       >
         <Card
-          className="module-card"
-          onClick={() => navigate("/profile")}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              navigate("/profile");
-            }
-          }}
+          className={moduleCardClass("profile")}
+          onClick={() => selectModule("profile")}
+          onKeyDown={(event) => handleModuleKeyDown(event, "profile")}
+          aria-pressed={activeModule === "profile"}
           role="button"
           tabIndex={0}
         >
           <UsersThree size={30} weight="duotone" />
           <h2>Profile setup</h2>
-          <p>Add courses, study goals, pace, and collaboration style.</p>
-        </Card>
-        <Card>
-          <CalendarCheck size={30} weight="duotone" />
-          <h2>Group matching</h2>
-          <p>Find classmates whose schedules and study habits fit yours.</p>
+          <p>Add courses, quarters, lecture numbers, goals, pace, and group size.</p>
         </Card>
         <Card
-          className={
-            activeModule === "workspace"
-              ? "module-card active-module-card"
-              : "module-card"
-          }
-          onClick={() => setActiveModule("workspace")}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              setActiveModule("workspace");
-            }
-          }}
+          className={moduleCardClass("matching")}
+          onClick={() => selectModule("matching")}
+          onKeyDown={(event) => handleModuleKeyDown(event, "matching")}
+          aria-pressed={activeModule === "matching"}
+          role="button"
+          tabIndex={0}
+        >
+          <CalendarCheck size={30} weight="duotone" />
+          <h2>Group matching</h2>
+          <p>Browse course groups, filter by fit, and apply to join.</p>
+        </Card>
+        <Card
+          className={moduleCardClass("workspace")}
+          onClick={() => selectModule("workspace")}
+          onKeyDown={(event) => handleModuleKeyDown(event, "workspace")}
+          aria-pressed={activeModule === "workspace"}
           role="button"
           tabIndex={0}
         >
           <NotePencil size={30} weight="duotone" />
-          <h2>Shared workspace</h2>
+          <h2>Shared workspaces</h2>
           <p>Keep notes, comments, and study materials in one calm place.</p>
         </Card>
         <Card
-          className={
-            activeModule === "discussion"
-              ? "module-card active-module-card"
-              : "module-card"
-          }
-          onClick={() => setActiveModule("discussion")}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              setActiveModule("discussion");
-            }
-          }}
+          className={moduleCardClass("discussion")}
+          onClick={() => selectModule("discussion")}
+          onKeyDown={(event) => handleModuleKeyDown(event, "discussion")}
+          aria-pressed={activeModule === "discussion"}
           role="button"
           tabIndex={0}
         >
@@ -173,37 +268,18 @@ export function DashboardPage() {
         </Card>
       </section>
 
-      <section className="activity-feed">
-        <h2>Recent Activity</h2>
-        {mockActivity.length > 0 ? (
-          <div>
-            {mockActivity.map((activity) => (
-              <ActivityCard
-                key={activity.id}
-                name={activity.name}
-                action={activity.action}
-                target={activity.target}
-                group={activity.group}
-                time={activity.time}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state-card">
-            <BinocularsIcon size={32} weight="duotone" />
-            <h3>No Recent Activity!</h3>
-            <p>Join a study group to see what your classmates are up to!</p>
-            <Button
-              type="default"
-              style={{ marginTop: "12px", borderRadius: "10px" }}
-            >
-              Find Groups
-            </Button>
-          </div>
-        )}
-      </section>
-
-      {activeModule && <WorkspaceModule mode={activeModule} />}
+      {activeModule === "profile" && <ProfileSetupModule />}
+      {activeModule === "matching" && <GroupMatchingModule />}
+      {(activeModule === "workspace" || activeModule === "discussion") && (
+        <WorkspaceModule
+          mode={activeModule}
+          initialGroupId={workspaceTarget?.groupId ?? null}
+          initialDocumentId={workspaceTarget?.documentId ?? null}
+          focusActivityId={workspaceTarget?.activityId ?? null}
+          focusRequestId={workspaceTarget?.requestId ?? 0}
+          onActivityChange={loadActivities}
+        />
+      )}
     </main>
   );
 }

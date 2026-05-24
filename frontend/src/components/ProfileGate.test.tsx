@@ -22,13 +22,19 @@ const baseUser: User = {
   created_at: '',
 };
 
-const baseProfile: Profile = {
-  courses: ['CS35L'],
+const baseCourse = {
+  user_course_id: 1,
+  course_id: 1,
+  course_code: 'CS35L',
+  course_quarter: 'Spring 2026',
+  lecture_number: 1,
   study_goals: [],
   pace_preference: null,
-  study_style_preference: null,
   group_size_preference: null,
-  preferred_study_time_tags: [],
+};
+
+const baseProfile: Profile = {
+  courses: [baseCourse],
   has_basic_profile: true,
   is_complete: false,
   created_at: '',
@@ -133,7 +139,7 @@ describe('ProfileGate', () => {
     profileState = {
       profile: {
         ...baseProfile,
-        courses: ['CS35L'],
+        courses: [{ ...baseCourse, study_goals: [], pace_preference: null }],
         has_basic_profile: true,
         is_complete: false,
       },
@@ -153,9 +159,13 @@ describe('ProfileGate', () => {
     profileState = {
       profile: {
         ...baseProfile,
-        study_goals: ['exam_prep'],
-        pace_preference: 'moderate',
-        study_style_preference: 'problem_solving',
+        courses: [
+          {
+            ...baseCourse,
+            study_goals: ['exam_prep'],
+            pace_preference: 'moderate',
+          },
+        ],
         has_basic_profile: true,
         is_complete: true,
       },

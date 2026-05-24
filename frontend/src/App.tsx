@@ -33,16 +33,8 @@ export function App() {
           element={
             <ProtectedRoute>
               <ProfileGate redirectCompleteSetup>
-                <ProfilePage mode="setup" />
+                <ProfilePage />
               </ProfileGate>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <ProfilePage mode="edit" />
             </ProtectedRoute>
           }
         />

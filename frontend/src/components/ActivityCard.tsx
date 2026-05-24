@@ -6,6 +6,7 @@ interface ActivityCardProps {
   target: string;
   group: string;
   time: string;
+  onView?: () => void;
 }
 
 export function ActivityCard({
@@ -14,6 +15,7 @@ export function ActivityCard({
   target,
   group,
   time,
+  onView,
 }: ActivityCardProps) {
   return (
     <Card
@@ -39,6 +41,8 @@ export function ActivityCard({
       >
         <span className="activity-tag">#{group}</span>
         <Button
+          aria-label={`View ${target}`}
+          onClick={onView}
           size="small"
           type="text"
           style={{ color: "#3b9f89", fontWeight: 600 }}

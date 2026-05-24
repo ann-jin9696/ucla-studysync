@@ -89,7 +89,7 @@ export function AuthShell({
           </div>
           <p className="service-panel-copy">
             StudySync helps UCLA students find compatible classmates, plan sessions,
-            and keep every group resource in one bright workspace.
+            and keep every group resource in bright shared workspaces.
           </p>
           <div className="service-grid">
             {services.map((service) => (

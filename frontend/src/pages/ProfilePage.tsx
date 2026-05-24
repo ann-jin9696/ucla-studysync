@@ -9,11 +9,7 @@ import { EMPTY_PROFILE, getMissingProfileSections } from '../profileOptions';
 import type { ProfileInput } from '../api';
 import studySyncLogo from '../assets/studysync-logo.png';
 
-type ProfilePageProps = {
-  mode: 'setup' | 'edit';
-};
-
-export function ProfilePage({ mode }: ProfilePageProps) {
+export function ProfilePage() {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const { profile, error, saveProfile } = useProfile();
@@ -25,7 +21,6 @@ export function ProfilePage({ mode }: ProfilePageProps) {
     () => getMissingProfileSections(activeProfile),
     [activeProfile],
   );
-  const isSetup = mode === 'setup';
 
   async function handleLogout() {
     await logout();
@@ -37,7 +32,7 @@ export function ProfilePage({ mode }: ProfilePageProps) {
     try {
       const savedProfile = await saveProfile(input);
       messageApi.success('Profile saved.');
-      if (isSetup && savedProfile.has_basic_profile) {
+      if (savedProfile.has_basic_profile) {
         navigate('/dashboard', { replace: true });
       }
     } catch (err) {
@@ -57,7 +52,7 @@ export function ProfilePage({ mode }: ProfilePageProps) {
           </div>
           <div>
             <p className="brand-kicker">StudySync</p>
-            <strong>{isSetup ? 'Profile setup' : 'Edit profile'}</strong>
+            <strong>Profile setup</strong>
           </div>
         </div>
         <div className="dashboard-actions">
@@ -73,10 +68,10 @@ export function ProfilePage({ mode }: ProfilePageProps) {
       <section className="profile-header">
         <div>
           <p className="eyebrow">Study profile</p>
-          <h1>{isSetup ? 'Tell StudySync what you are taking.' : 'Keep your profile current.'}</h1>
+          <h1>Tell StudySync what you are taking.</h1>
           <p>
-            Courses unlock your dashboard. Goals, pace, and style make your profile ready
-            for better group matching later.
+            Courses unlock your dashboard. Each course offering can keep its own goals,
+            pace, and group size for matching.
           </p>
         </div>
         <div className="profile-status-card">
