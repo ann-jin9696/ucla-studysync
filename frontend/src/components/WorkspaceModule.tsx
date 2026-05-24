@@ -138,9 +138,33 @@ export function WorkspaceModule({
   const [uploading, setUploading] = useState(false);
   const [postingComment, setPostingComment] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<GroupDocument | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [groupDetailOpen, setGroupDetailOpen] = useState(false);
   const [selectedGroupDetail, setSelectedGroupDetail] = useState<GroupDetail | null>(null);
   const [loadingGroupDetail, setLoadingGroupDetail] = useState(false);
+
+  useEffect(() => {
+    if (!previewDocument) {
+      setPreviewUrl(null);
+      return;
+    }
+    let objectUrl: string;
+    fetch(groupApi.documentFileUrl(previewDocument.group_id, previewDocument.id), {
+      credentials: 'include',
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error(`Failed to load file: ${r.status}`);
+        return r.blob();
+      })
+      .then((blob) => {
+        objectUrl = URL.createObjectURL(blob);
+        setPreviewUrl(objectUrl);
+      })
+      .catch((err) => console.error('File preview failed:', err));
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [previewDocument]);
 
   const selectedGroup = useMemo(
     () => groups.find((group) => group.id === selectedGroupId) ?? null,
@@ -435,19 +459,19 @@ export function WorkspaceModule({
             <img
               alt={previewDocument.title}
               className="document-preview-image"
-              src={groupApi.documentFileUrl(previewDocument.group_id, previewDocument.id)}
+              src={previewUrl ?? undefined}
             />
           ) : isPdfDocument(previewDocument) ? (
             <iframe
               className="document-preview-frame"
-              src={groupApi.documentFileUrl(previewDocument.group_id, previewDocument.id)}
+              src={previewUrl ?? undefined}
               title={previewDocument.title}
             />
           ) : (
             <div className="document-preview-fallback">
               <p>This file type cannot be previewed directly in the browser.</p>
               <Button
-                href={groupApi.documentFileUrl(previewDocument.group_id, previewDocument.id)}
+                href={previewUrl ?? undefined}
                 target="_blank"
                 type="primary"
               >
@@ -628,6 +652,9 @@ export function WorkspaceModule({
                         <input key={fileInputKey} type="file" onChange={handleFileChange} />
                         <span>{uploadFile ? uploadFile.name : 'Choose a file'}</span>
                       </label>
+                      <p style={{ fontSize: '12px', color: '#888', margin: '4px 0 0' }}>
+                        Only PDF and image files can be previewed in the browser.
+                      </p>
                       <Button
                         block
                         htmlType="submit"
