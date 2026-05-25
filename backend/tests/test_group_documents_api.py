@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -85,6 +87,27 @@ def upload_document(client: TestClient, group_id: int, title: str) -> dict[str, 
     )
     assert response.status_code == 201
     return response.json()
+
+
+def add_member_to_group(
+    client: TestClient,
+    group_id: int,
+    email: str = "member@g.ucla.edu",
+    full_name: str = "Member Bruin",
+) -> None:
+    client.post("/api/auth/logout")
+    signup(client, email, full_name)
+    update_profile(client)
+    join_request = client.post(f"/api/groups/{group_id}/join-requests")
+    assert join_request.status_code == 201
+    client.post("/api/auth/logout")
+    login(client, "owner@g.ucla.edu")
+    approve = client.post(
+        f"/api/groups/{group_id}/join-requests/{join_request.json()['id']}/approve"
+    )
+    assert approve.status_code == 200
+    client.post("/api/auth/logout")
+    login(client, email)
 
 
 class ReadyDocumentQA:
@@ -220,6 +243,7 @@ def test_user_can_upload_search_and_comment_on_group_document(tmp_path, monkeypa
         assert document["file_name"] == "week-1-notes.pdf"
         assert document["document_type"] == "pdf"
         assert document["uploader_name"] == "Workspace Bruin"
+        assert document["file_size_bytes"] == len(b"StudySync group notes")
         assert document["ai_summary"] is None
 
         saved_file = tmp_path / "uploads" / f"group-{group_id}" / "1-week-1-notes.pdf"
@@ -474,3 +498,103 @@ def test_upload_rejects_unsupported_file_type(tmp_path, monkeypatch):
 
     assert response.status_code == 422
     assert "PDF, PNG, JPG, TXT, or MD" in response.json()["detail"]
+
+
+def test_upload_rejects_files_over_per_file_limit(tmp_path, monkeypatch):
+    monkeypatch.setattr(groups, "MAX_DOCUMENT_FILE_BYTES", 10)
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client)
+        group_id = create_profile_group(client)
+
+        response = client.post(
+            f"/api/groups/{group_id}/documents",
+            data={"title": "Large File", "document_type": "notes"},
+            files={"file": ("large.txt", b"x" * 11, "text/plain")},
+        )
+        listed = client.get(f"/api/groups/{group_id}/documents")
+
+    assert response.status_code == 413
+    assert "per-file limit" in response.json()["detail"]
+    assert listed.json()["documents"] == []
+    assert list((tmp_path / "uploads" / f"group-{group_id}").iterdir()) == []
+
+
+def test_upload_rejects_when_group_storage_limit_would_be_exceeded(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr(groups, "MAX_DOCUMENT_FILE_BYTES", 100)
+    monkeypatch.setattr(groups, "MAX_GROUP_STORAGE_BYTES", 20)
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client)
+        group_id = create_profile_group(client)
+
+        first = client.post(
+            f"/api/groups/{group_id}/documents",
+            data={"title": "First", "document_type": "notes"},
+            files={"file": ("first.txt", b"x" * 12, "text/plain")},
+        )
+        second = client.post(
+            f"/api/groups/{group_id}/documents",
+            data={"title": "Second", "document_type": "notes"},
+            files={"file": ("second.txt", b"x" * 9, "text/plain")},
+        )
+        listed = client.get(f"/api/groups/{group_id}/documents")
+
+    assert first.status_code == 201
+    assert second.status_code == 413
+    assert [document["title"] for document in listed.json()["documents"]] == ["First"]
+
+
+def test_file_owner_can_delete_group_document(tmp_path, monkeypatch):
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client)
+        group_id = create_profile_group(client)
+        document = upload_document(client, group_id, "Delete Me")
+        comment = client.post(
+            f"/api/groups/{group_id}/documents/{document['id']}/comments",
+            json={"content": "Remove this with the file."},
+        )
+        delete = client.delete(f"/api/groups/{group_id}/documents/{document['id']}")
+        listed = client.get(f"/api/groups/{group_id}/documents")
+        comments = client.get(
+            f"/api/groups/{group_id}/documents/{document['id']}/comments"
+        )
+
+    assert comment.status_code == 201
+    assert delete.status_code == 204
+    assert listed.json()["documents"] == []
+    assert comments.status_code == 404
+    assert not Path(str(document["file_path"])).exists()
+
+
+def test_group_owner_can_delete_member_document(tmp_path, monkeypatch):
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client, "owner@g.ucla.edu", "Owner Bruin")
+        group_id = create_profile_group(client)
+        add_member_to_group(client, group_id)
+        member_document = upload_document(client, group_id, "Member Notes")
+
+        client.post("/api/auth/logout")
+        login(client, "owner@g.ucla.edu")
+        delete = client.delete(
+            f"/api/groups/{group_id}/documents/{member_document['id']}"
+        )
+        listed = client.get(f"/api/groups/{group_id}/documents")
+
+    assert delete.status_code == 204
+    assert listed.json()["documents"] == []
+
+
+def test_member_cannot_delete_someone_elses_document(tmp_path, monkeypatch):
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client, "owner@g.ucla.edu", "Owner Bruin")
+        group_id = create_profile_group(client)
+        owner_document = upload_document(client, group_id, "Owner Notes")
+
+        add_member_to_group(client, group_id)
+        delete = client.delete(
+            f"/api/groups/{group_id}/documents/{owner_document['id']}"
+        )
+
+    assert delete.status_code == 403

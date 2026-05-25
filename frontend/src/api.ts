@@ -140,10 +140,12 @@ export type GroupDocument = {
   title: string;
   file_name: string;
   file_path: string;
+  file_size_bytes: number;
   document_type: string;
   index_status: 'indexing' | 'ready' | 'failed';
   index_error: string | null;
   ai_summary: string | null;
+  can_delete: boolean;
   uploaded_at: string;
 };
 
@@ -374,6 +376,11 @@ export const groupApi = {
     return request<GroupDocument>(`/api/groups/${input.group_id}/documents`, {
       method: 'POST',
       body: formData,
+    });
+  },
+  deleteDocument(groupId: number, documentId: number) {
+    return request<void>(`/api/groups/${groupId}/documents/${documentId}`, {
+      method: 'DELETE',
     });
   },
   listComments(groupId: number, documentId: number) {

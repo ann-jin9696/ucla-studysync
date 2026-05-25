@@ -21,6 +21,7 @@ import {
   NotePencil,
   PaperPlaneTilt,
   Sparkle,
+  Trash,
   UsersThree,
 } from '@phosphor-icons/react';
 import type { Group, GroupDetail, GroupDocument } from '../api';
@@ -45,6 +46,7 @@ const DOCUMENT_TYPES = [
 const SUPPORTED_UPLOAD_EXTENSIONS = ['.pdf', '.png', '.jpg', '.txt', '.md'];
 const SUPPORTED_UPLOAD_ACCEPT = SUPPORTED_UPLOAD_EXTENSIONS.join(',');
 const SUPPORTED_UPLOAD_LABEL = 'PDF, PNG, JPG, TXT, or MD';
+const MAX_UPLOAD_FILE_MB = 50;
 
 const STUDY_GOAL_LABELS = new Map(
   STUDY_GOAL_OPTIONS.map((option) => [option.value, option.label]),
@@ -497,6 +499,33 @@ export function WorkspaceModule({
     }
   }
 
+  function handleDeleteDocument(documentToDelete: GroupDocument) {
+    Modal.confirm({
+      title: `Delete ${documentToDelete.title}?`,
+      content: 'This removes the shared file and its comments from the group.',
+      okText: 'Delete',
+      okButtonProps: { danger: true },
+      async onOk() {
+        try {
+          await groupApi.deleteDocument(documentToDelete.group_id, documentToDelete.id);
+          messageApi.success('Document deleted.');
+          setPreviewDocument((currentDocument) =>
+            currentDocument?.id === documentToDelete.id ? null : currentDocument,
+          );
+          setComments((currentComments) =>
+            selectedDocumentId === documentToDelete.id ? [] : currentComments,
+          );
+          await loadDocuments(searchQuery, documentToDelete.group_id);
+          onActivityChange?.();
+        } catch (error) {
+          messageApi.error(
+            error instanceof Error ? error.message : 'Could not delete document.',
+          );
+        }
+      },
+    });
+  }
+
   async function handlePostComment() {
     if (!selectedGroupId || !selectedDocument || !commentText.trim()) {
       return;
@@ -541,6 +570,12 @@ export function WorkspaceModule({
       setUploadFile(null);
       event.target.value = '';
       messageApi.warning(`Choose a ${SUPPORTED_UPLOAD_LABEL} file.`);
+      return;
+    }
+    if (nextFile && nextFile.size > MAX_UPLOAD_FILE_MB * 1024 * 1024) {
+      setUploadFile(null);
+      event.target.value = '';
+      messageApi.warning(`Choose a file ${MAX_UPLOAD_FILE_MB} MB or smaller.`);
       return;
     }
     setUploadFile(nextFile);
@@ -746,6 +781,17 @@ export function WorkspaceModule({
                 </Button>
               </div>
             )}
+            {previewDocument.can_delete && (
+              <div className="document-preview-actions">
+                <Button
+                  danger
+                  icon={<Trash size={18} weight="bold" />}
+                  onClick={() => handleDeleteDocument(previewDocument)}
+                >
+                  Delete
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </Modal>
@@ -927,7 +973,8 @@ export function WorkspaceModule({
                         <span>{uploadFile ? uploadFile.name : 'Choose a file'}</span>
                       </label>
                       <p style={{ fontSize: '12px', color: '#888', margin: '4px 0 0' }}>
-                        Upload and preview {SUPPORTED_UPLOAD_LABEL} files.
+                        Upload and preview {SUPPORTED_UPLOAD_LABEL} files, up to{' '}
+                        {MAX_UPLOAD_FILE_MB} MB each.
                       </p>
                       <Button
                         block
@@ -1119,6 +1166,15 @@ export function WorkspaceModule({
                             <Button onClick={() => setPreviewDocument(selectedDocument)}>
                               Preview file
                             </Button>
+                            {selectedDocument.can_delete && (
+                              <Button
+                                danger
+                                icon={<Trash size={18} weight="bold" />}
+                                onClick={() => handleDeleteDocument(selectedDocument)}
+                              >
+                                Delete
+                              </Button>
+                            )}
                           </div>
                         </div>
 

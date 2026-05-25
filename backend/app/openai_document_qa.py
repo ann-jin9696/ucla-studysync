@@ -181,6 +181,22 @@ class OpenAIDocumentQA:
         summary = str(_read_attr(response, "output_text", "")).strip()
         return " ".join(summary.split())
 
+    def delete_document(
+        self,
+        *,
+        vector_store_id: str | None,
+        vector_store_file_id: str | None,
+        openai_file_id: str | None,
+    ) -> None:
+        client = self._client()
+        if vector_store_id and vector_store_file_id:
+            client.vector_stores.files.delete(
+                vector_store_id=vector_store_id,
+                file_id=vector_store_file_id,
+            )
+        if openai_file_id:
+            client.files.delete(openai_file_id)
+
     def _extract_sources(self, response: Any) -> list[DocumentQASourceResult]:
         sources: list[DocumentQASourceResult] = []
         seen: set[tuple[int | None, str, str]] = set()
