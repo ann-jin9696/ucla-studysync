@@ -41,12 +41,26 @@ router = APIRouter(prefix="/api/groups", tags=["groups"])
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 UPLOAD_DIR = BACKEND_DIR / "data" / "uploads"
+SUPPORTED_DOCUMENT_EXTENSIONS = {".pdf", ".png", ".jpg", ".txt", ".md"}
+SUPPORTED_DOCUMENT_EXTENSION_LABEL = "PDF, PNG, JPG, TXT, or MD"
 
 
 def clean_file_name(file_name: str) -> str:
     name = Path(file_name).name.strip()
     name = re.sub(r"[^A-Za-z0-9._-]+", "-", name)
     return name or "uploaded-file"
+
+
+def get_file_extension(file_name: str) -> str:
+    return Path(file_name).suffix.lower()
+
+
+def require_supported_document_file(file_name: str) -> None:
+    if get_file_extension(file_name) not in SUPPORTED_DOCUMENT_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Please upload a {SUPPORTED_DOCUMENT_EXTENSION_LABEL} file.",
+        )
 
 
 def stored_file_path(path: Path) -> str:
@@ -1037,6 +1051,7 @@ def upload_document(
 ) -> DocumentResponse:
     require_group_member(db, group_id, int(user["id"]))
     clean_name = clean_file_name(file.filename or "uploaded-file")
+    require_supported_document_file(clean_name)
     group_upload_dir = UPLOAD_DIR / f"group-{group_id}"
     group_upload_dir.mkdir(parents=True, exist_ok=True)
 
