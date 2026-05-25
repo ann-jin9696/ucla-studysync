@@ -45,6 +45,12 @@ cd backend
 uv run pytest
 ```
 
+## Database Selection
+
+Local desktop runs use SQLite by default. OCI deployments and desktop ATP debug runs
+can use Oracle Autonomous Database by setting backend environment variables; see
+[backend/README.md](backend/README.md#database-mode).
+
 Frontend:
 
 ```sh

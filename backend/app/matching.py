@@ -116,7 +116,17 @@ def list_course_groups(
         JOIN users owner ON owner.id = groups.created_by_user_id
         LEFT JOIN group_members ON group_members.group_id = groups.id
         WHERE groups.course_id = ?
-        GROUP BY groups.id
+        GROUP BY
+            groups.id,
+            groups.name,
+            groups.course_id,
+            courses.course_code,
+            courses.course_quarter,
+            courses.lecture_number,
+            groups.created_by_user_id,
+            owner.full_name,
+            groups.created_at,
+            groups.updated_at
         """,
         (user_id, user_course["course_id"]),
     ).fetchall()
