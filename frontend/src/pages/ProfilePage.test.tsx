@@ -36,7 +36,16 @@ let profileState: {
 
 vi.mock('../components/AuthProvider', () => ({
   useAuth: () => ({
+    user: {
+      id: 1,
+      full_name: 'Sunny Bruin',
+      email: 'sunny@g.ucla.edu',
+      email_verified: true,
+      notify_group_application_news: true,
+      created_at: '',
+    },
     logout: vi.fn(),
+    refreshUser: vi.fn(),
   }),
 }));
 

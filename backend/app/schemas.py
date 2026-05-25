@@ -7,6 +7,7 @@ class SignupRequest(BaseModel):
     full_name: str = Field(min_length=1, max_length=120)
     email: str = Field(min_length=3, max_length=254)
     password: str = Field(min_length=8, max_length=128)
+    notify_group_application_news: bool = True
 
 
 class LoginRequest(BaseModel):
@@ -18,11 +19,30 @@ class UserResponse(BaseModel):
     id: int
     full_name: str
     email: str
+    email_verified: bool
+    notify_group_application_news: bool
     created_at: str
 
 
 class AuthResponse(BaseModel):
     user: UserResponse
+
+
+class EmailVerificationRequest(BaseModel):
+    token: str = Field(min_length=16, max_length=256)
+
+
+class PasswordResetRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    token: str = Field(min_length=16, max_length=256)
+    password: str = Field(min_length=8, max_length=128)
+
+
+class EmailPreferencesRequest(BaseModel):
+    notify_group_application_news: bool
 
 
 class ProfileCourseResponse(BaseModel):

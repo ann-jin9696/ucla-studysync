@@ -19,6 +19,8 @@ const baseUser: User = {
   id: 1,
   full_name: 'Test Bruin',
   email: 'test@g.ucla.edu',
+  email_verified: true,
+  notify_group_application_news: true,
   created_at: '',
 };
 
