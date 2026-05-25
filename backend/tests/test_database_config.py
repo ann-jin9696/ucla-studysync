@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app import config
+from app import oracle_db
 from app.oracle_db import (
     _prepare_oracle_statement,
     _rewrite_datetime_now,
@@ -71,3 +72,30 @@ def test_oracle_datetime_rewrite_consumes_datetime_parameter_only():
 
     assert "TO_CHAR(SYSTIMESTAMP + INTERVAL '24' HOUR" in sql
     assert params == (7, "hash")
+
+
+def test_oracle_engine_checks_pooled_connections(monkeypatch):
+    captured: dict[str, object] = {}
+
+    def fake_create_engine(url: str, **kwargs):
+        captured["url"] = url
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setenv("STUDYSYNC_ORACLE_USER", "admin")
+    monkeypatch.setenv("STUDYSYNC_ORACLE_PASSWORD", "password")
+    monkeypatch.setenv("STUDYSYNC_ORACLE_DSN", "database_tp")
+    monkeypatch.delenv("STUDYSYNC_ORACLE_WALLET_DIR", raising=False)
+    monkeypatch.delenv("STUDYSYNC_ORACLE_WALLET_PASSWORD", raising=False)
+    monkeypatch.setattr(oracle_db, "_ENGINE", None)
+    monkeypatch.setattr(oracle_db, "create_engine", fake_create_engine)
+
+    try:
+        oracle_db.get_oracle_engine()
+    finally:
+        oracle_db._ENGINE = None
+
+    assert captured["url"] == "oracle+oracledb://"
+    assert captured["future"] is True
+    assert captured["pool_pre_ping"] is True
+    assert captured["pool_recycle"] == 1800

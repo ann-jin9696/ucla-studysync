@@ -134,7 +134,13 @@ def get_oracle_engine() -> Engine:
     if wallet_password is not None:
         connect_args["wallet_password"] = wallet_password
 
-    _ENGINE = create_engine("oracle+oracledb://", connect_args=connect_args, future=True)
+    _ENGINE = create_engine(
+        "oracle+oracledb://",
+        connect_args=connect_args,
+        future=True,
+        pool_pre_ping=True,
+        pool_recycle=1800,
+    )
     return _ENGINE
 
 
