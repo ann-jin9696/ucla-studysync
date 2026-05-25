@@ -218,6 +218,17 @@ h1 {
   text-align: center;
 }
 
+.auth-secondary-link {
+  margin: 2px 0 0;
+  font-family: 'Comfortaa', 'Avenir Next', 'Segoe UI', sans-serif;
+  text-align: center;
+}
+
+.auth-action-stack {
+  display: grid;
+  gap: 16px;
+}
+
 .classroom-card {
   width: 100%;
   max-width: 560px;
@@ -595,6 +606,37 @@ h1 {
 .profile-field-note {
   color: #667c74;
   font-family: 'Comfortaa', 'Avenir Next', 'Segoe UI', sans-serif;
+}
+
+.email-preference-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border: 1px solid rgba(121, 207, 183, 0.26);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.email-preference-row > div {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.email-preference-row svg {
+  color: #3b9f89;
+}
+
+.email-preference-row strong,
+.email-preference-row span {
+  display: block;
+}
+
+.email-preference-row span {
+  color: #70877d;
+  font-size: 0.92rem;
 }
 
 .profile-shell {

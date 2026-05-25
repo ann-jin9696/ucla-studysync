@@ -83,6 +83,41 @@ def test_applicant_can_submit_join_request(tmp_path, monkeypatch):
     assert body["user_name"] == "Applicant Bruin"
 
 
+def test_application_news_emails_notify_reviewer_and_applicant(tmp_path, monkeypatch):
+    reviewer_emails: list[tuple] = []
+    decision_emails: list[tuple] = []
+    monkeypatch.setattr(
+        groups,
+        "send_group_application_reviewer_email",
+        lambda *args: reviewer_emails.append(args) or True,
+    )
+    monkeypatch.setattr(
+        groups,
+        "send_group_application_decision_email",
+        lambda *args: decision_emails.append(args) or True,
+    )
+
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client, "owner@g.ucla.edu", "Owner Bruin")
+        group_id = create_group(client, "Project Studio")
+        client.post("/api/auth/logout")
+
+        signup(client, "applicant@g.ucla.edu", "Applicant Bruin")
+        enroll_in_course(client)
+        join_request = client.post(f"/api/groups/{group_id}/join-requests").json()
+        client.post("/api/auth/logout")
+
+        login(client, "owner@g.ucla.edu")
+        client.post(f"/api/groups/{group_id}/join-requests/{join_request['id']}/approve")
+
+    assert reviewer_emails == [
+        ("owner@g.ucla.edu", "Owner Bruin", "Applicant Bruin", "Project Studio")
+    ]
+    assert decision_emails == [
+        ("applicant@g.ucla.edu", "Applicant Bruin", "Project Studio", "approved")
+    ]
+
+
 def test_apply_requires_login(tmp_path, monkeypatch):
     with make_client(tmp_path, monkeypatch) as client:
         signup(client, "owner@g.ucla.edu")
