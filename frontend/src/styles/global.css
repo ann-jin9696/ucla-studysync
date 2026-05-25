@@ -1413,6 +1413,61 @@ h1 {
   background: #ffffff;
 }
 
+.document-preview-text,
+.document-preview-markdown {
+  width: 100%;
+  max-height: min(72vh, 720px);
+  overflow: auto;
+  margin: 0;
+  padding: 20px;
+  border: 1px solid rgba(121, 207, 183, 0.26);
+  border-radius: 14px;
+  background: #ffffff;
+  color: #24483e;
+  text-align: left;
+}
+
+.document-preview-text {
+  white-space: pre-wrap;
+  font-family: "Courier New", monospace;
+  line-height: 1.55;
+}
+
+.document-preview-markdown {
+  display: block;
+  line-height: 1.65;
+}
+
+.document-preview-markdown h1,
+.document-preview-markdown h2,
+.document-preview-markdown h3,
+.document-preview-markdown p,
+.document-preview-markdown ul,
+.document-preview-markdown ol,
+.document-preview-markdown blockquote,
+.document-preview-markdown pre {
+  margin-top: 0;
+}
+
+.document-preview-markdown h1,
+.document-preview-markdown h2,
+.document-preview-markdown h3 {
+  color: #173b33;
+}
+
+.document-preview-markdown blockquote {
+  padding-left: 14px;
+  border-left: 3px solid #79cfb7;
+  color: #4f665f;
+}
+
+.document-preview-markdown pre {
+  overflow: auto;
+  padding: 14px;
+  border-radius: 10px;
+  background: #edf8f1;
+}
+
 .document-preview-fallback {
   display: grid;
   gap: 16px;
