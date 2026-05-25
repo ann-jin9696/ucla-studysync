@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 import sqlite3
 from mimetypes import guess_type
@@ -8,6 +9,7 @@ from uuid import uuid4
 
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Depends,
     File,
     Form,
@@ -19,7 +21,7 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse
 
-from .db import get_db
+from .db import get_connection, get_db
 from .email import (
     send_group_application_decision_email,
     send_group_application_reviewer_email,
@@ -56,6 +58,7 @@ from .security import get_current_user
 
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
+logger = logging.getLogger(__name__)
 document_qa_service = OpenAIDocumentQA()
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -406,6 +409,41 @@ def index_saved_document(
         ),
     )
     db.commit()
+
+
+def index_saved_document_task(
+    group_id: int,
+    document_id: int,
+    file_name: str,
+    stored_path: str,
+) -> None:
+    db = get_connection()
+    try:
+        index_saved_document(
+            db,
+            group_id,
+            document_id,
+            file_name,
+            resolve_stored_file_path(stored_path),
+        )
+    except Exception:
+        logger.exception(
+            "Document indexing background task failed for document %s",
+            document_id,
+        )
+        try:
+            mark_document_index_failed(
+                db,
+                document_id,
+                "OpenAI indexing failed in background task.",
+            )
+        except Exception:
+            logger.exception(
+                "Could not mark document %s indexing as failed",
+                document_id,
+            )
+    finally:
+        db.close()
 
 
 def forget_indexed_document(group: sqlite3.Row, document: sqlite3.Row) -> None:
@@ -1297,6 +1335,7 @@ def list_documents(
 )
 def upload_document(
     group_id: int,
+    background_tasks: BackgroundTasks,
     title: str = Form(..., min_length=1, max_length=160),
     document_type: str = Form(..., min_length=1, max_length=40),
     file: UploadFile = File(...),
@@ -1325,6 +1364,7 @@ def upload_document(
     initial_file_path = stored_file_path(temp_path)
 
     saved_path: Path | None = None
+    final_file_path: str | None = None
     try:
         cursor = db.execute(
             """
@@ -1354,10 +1394,11 @@ def upload_document(
         saved_name = f"{document_id}-{clean_name}"
         saved_path = group_upload_dir / saved_name
         temp_path.replace(saved_path)
+        final_file_path = stored_file_path(saved_path)
 
         db.execute(
             "UPDATE documents SET file_path = ? WHERE id = ?",
-            (stored_file_path(saved_path), document_id),
+            (final_file_path, document_id),
         )
         db.execute(
             "UPDATE groups SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -1370,8 +1411,6 @@ def upload_document(
         if saved_path is not None:
             saved_path.unlink(missing_ok=True)
         raise
-
-    index_saved_document(db, group_id, document_id, clean_name, saved_path)
 
     row = db.execute(
         """
@@ -1397,6 +1436,15 @@ def upload_document(
         """,
         (document_id,),
     ).fetchone()
+
+    assert final_file_path is not None
+    background_tasks.add_task(
+        index_saved_document_task,
+        group_id,
+        document_id,
+        clean_name,
+        final_file_path,
+    )
 
     return serialize_document(row, can_delete=True)
 
