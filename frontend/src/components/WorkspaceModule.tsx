@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, ReactNode } from 'react';
 import {
   Button,
   Card,
@@ -41,6 +41,9 @@ const DOCUMENT_TYPES = [
   { label: 'Review Guide', value: 'review' },
   { label: 'Other', value: 'other' },
 ];
+const SUPPORTED_UPLOAD_EXTENSIONS = ['.pdf', '.png', '.jpg', '.txt', '.md'];
+const SUPPORTED_UPLOAD_ACCEPT = SUPPORTED_UPLOAD_EXTENSIONS.join(',');
+const SUPPORTED_UPLOAD_LABEL = 'PDF, PNG, JPG, TXT, or MD';
 
 const STUDY_GOAL_LABELS = new Map(
   STUDY_GOAL_OPTIONS.map((option) => [option.value, option.label]),
@@ -84,12 +87,33 @@ function formatGroupSizeBucket(value: string) {
   return 'Unknown size';
 }
 
+function getFileExtension(fileName: string) {
+  const extensionStart = fileName.lastIndexOf('.');
+  return extensionStart >= 0 ? fileName.slice(extensionStart).toLowerCase() : '';
+}
+
+function isSupportedUploadFile(file: File) {
+  return SUPPORTED_UPLOAD_EXTENSIONS.includes(getFileExtension(file.name));
+}
+
 function isImageDocument(document: GroupDocument) {
-  return /\.(apng|avif|gif|jpe?g|png|svg|webp)$/i.test(document.file_name);
+  return /\.(jpg|png)$/i.test(document.file_name);
 }
 
 function isPdfDocument(document: GroupDocument) {
   return /\.pdf$/i.test(document.file_name);
+}
+
+function isPlainTextDocument(document: GroupDocument) {
+  return /\.txt$/i.test(document.file_name);
+}
+
+function isMarkdownDocument(document: GroupDocument) {
+  return /\.md$/i.test(document.file_name);
+}
+
+function isTextPreviewDocument(document: GroupDocument) {
+  return isPlainTextDocument(document) || isMarkdownDocument(document);
 }
 
 function classNames(...names: Array<string | false | null | undefined>) {
@@ -99,6 +123,118 @@ function classNames(...names: Array<string | false | null | undefined>) {
 function getActivityTargetId(activityId: string | null | undefined, prefix: string) {
   const match = activityId?.match(new RegExp(`^${prefix}-(\\d+)$`));
   return match ? Number(match[1]) : null;
+}
+
+function renderHeading(level: number, content: string, key: string) {
+  if (level === 1) {
+    return <h1 key={key}>{content}</h1>;
+  }
+  if (level === 2) {
+    return <h2 key={key}>{content}</h2>;
+  }
+  return <h3 key={key}>{content}</h3>;
+}
+
+function renderMarkdownBlocks(markdown: string) {
+  const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+  const blocks: ReactNode[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index];
+    const trimmed = line.trim();
+    const blockKey = `markdown-block-${index}`;
+
+    if (!trimmed) {
+      index += 1;
+      continue;
+    }
+
+    if (trimmed.startsWith('```')) {
+      const codeLines: string[] = [];
+      index += 1;
+      while (index < lines.length && !lines[index].trim().startsWith('```')) {
+        codeLines.push(lines[index]);
+        index += 1;
+      }
+      if (index < lines.length) {
+        index += 1;
+      }
+      blocks.push(
+        <pre key={blockKey}>
+          <code>{codeLines.join('\n')}</code>
+        </pre>,
+      );
+      continue;
+    }
+
+    const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      blocks.push(renderHeading(heading[1].length, heading[2], blockKey));
+      index += 1;
+      continue;
+    }
+
+    if (/^[-*]\s+/.test(trimmed)) {
+      const items: string[] = [];
+      while (index < lines.length && /^[-*]\s+/.test(lines[index].trim())) {
+        items.push(lines[index].trim().replace(/^[-*]\s+/, ''));
+        index += 1;
+      }
+      blocks.push(
+        <ul key={blockKey}>
+          {items.map((item, itemIndex) => (
+            <li key={`${blockKey}-${itemIndex}`}>{item}</li>
+          ))}
+        </ul>,
+      );
+      continue;
+    }
+
+    if (/^\d+\.\s+/.test(trimmed)) {
+      const items: string[] = [];
+      while (index < lines.length && /^\d+\.\s+/.test(lines[index].trim())) {
+        items.push(lines[index].trim().replace(/^\d+\.\s+/, ''));
+        index += 1;
+      }
+      blocks.push(
+        <ol key={blockKey}>
+          {items.map((item, itemIndex) => (
+            <li key={`${blockKey}-${itemIndex}`}>{item}</li>
+          ))}
+        </ol>,
+      );
+      continue;
+    }
+
+    if (/^>\s?/.test(trimmed)) {
+      const quoteLines: string[] = [];
+      while (index < lines.length && /^>\s?/.test(lines[index].trim())) {
+        quoteLines.push(lines[index].trim().replace(/^>\s?/, ''));
+        index += 1;
+      }
+      blocks.push(<blockquote key={blockKey}>{quoteLines.join(' ')}</blockquote>);
+      continue;
+    }
+
+    const paragraphLines = [trimmed];
+    index += 1;
+    while (
+      index < lines.length &&
+      lines[index].trim() &&
+      !/^(#{1,3})\s+/.test(lines[index].trim()) &&
+      !/^[-*]\s+/.test(lines[index].trim()) &&
+      !/^\d+\.\s+/.test(lines[index].trim()) &&
+      !/^>\s?/.test(lines[index].trim()) &&
+      !lines[index].trim().startsWith('```')
+    ) {
+      paragraphLines.push(lines[index].trim());
+      index += 1;
+    }
+    blocks.push(<p key={blockKey}>{paragraphLines.join(' ')}</p>);
+  }
+
+  return blocks.length > 0 ? blocks : <p>No preview content available.</p>;
 }
 
 type WorkspaceModuleProps = {
@@ -139,6 +275,9 @@ export function WorkspaceModule({
   const [postingComment, setPostingComment] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<GroupDocument | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewText, setPreviewText] = useState<string | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [groupDetailOpen, setGroupDetailOpen] = useState(false);
   const [selectedGroupDetail, setSelectedGroupDetail] = useState<GroupDetail | null>(null);
   const [loadingGroupDetail, setLoadingGroupDetail] = useState(false);
@@ -146,22 +285,58 @@ export function WorkspaceModule({
   useEffect(() => {
     if (!previewDocument) {
       setPreviewUrl(null);
+      setPreviewText(null);
+      setPreviewError(null);
+      setLoadingPreview(false);
       return;
     }
-    let objectUrl: string;
-    fetch(groupApi.documentFileUrl(previewDocument.group_id, previewDocument.id), {
-      credentials: 'include',
-    })
-      .then((r) => {
-        if (!r.ok) throw new Error(`Failed to load file: ${r.status}`);
-        return r.blob();
-      })
-      .then((blob) => {
+    const currentPreviewDocument = previewDocument;
+    let objectUrl: string | null = null;
+    const controller = new AbortController();
+
+    setPreviewUrl(null);
+    setPreviewText(null);
+    setPreviewError(null);
+    setLoadingPreview(true);
+    async function loadPreview() {
+      try {
+        const response = await fetch(
+          groupApi.documentFileUrl(
+            currentPreviewDocument.group_id,
+            currentPreviewDocument.id,
+          ),
+          {
+            credentials: 'include',
+            signal: controller.signal,
+          },
+        );
+        if (!response.ok) {
+          throw new Error(`Failed to load file: ${response.status}`);
+        }
+
+        if (isTextPreviewDocument(currentPreviewDocument)) {
+          setPreviewText(await response.text());
+          return;
+        }
+
+        const blob = await response.blob();
         objectUrl = URL.createObjectURL(blob);
         setPreviewUrl(objectUrl);
-      })
-      .catch((err) => console.error('File preview failed:', err));
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        console.error('File preview failed:', error);
+        setPreviewError('Could not load this file preview.');
+      } finally {
+        setLoadingPreview(false);
+      }
+    }
+
+    void loadPreview();
+
     return () => {
+      controller.abort();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [previewDocument]);
@@ -316,7 +491,14 @@ export function WorkspaceModule({
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    setUploadFile(event.target.files?.[0] ?? null);
+    const nextFile = event.target.files?.[0] ?? null;
+    if (nextFile && !isSupportedUploadFile(nextFile)) {
+      setUploadFile(null);
+      event.target.value = '';
+      messageApi.warning(`Choose a ${SUPPORTED_UPLOAD_LABEL} file.`);
+      return;
+    }
+    setUploadFile(nextFile);
   }
 
   useEffect(() => {
@@ -455,7 +637,20 @@ export function WorkspaceModule({
         width={860}
       >
         {previewDocument &&
-          (isImageDocument(previewDocument) ? (
+          (loadingPreview ? (
+            <Spin />
+          ) : previewError ? (
+            <div className="document-preview-fallback">
+              <p>{previewError}</p>
+              <Button
+                href={previewUrl ?? groupApi.documentFileUrl(previewDocument.group_id, previewDocument.id)}
+                target="_blank"
+                type="primary"
+              >
+                Open file
+              </Button>
+            </div>
+          ) : isImageDocument(previewDocument) ? (
             <img
               alt={previewDocument.title}
               className="document-preview-image"
@@ -467,6 +662,12 @@ export function WorkspaceModule({
               src={previewUrl ?? undefined}
               title={previewDocument.title}
             />
+          ) : isPlainTextDocument(previewDocument) ? (
+            <pre className="document-preview-text">{previewText}</pre>
+          ) : isMarkdownDocument(previewDocument) ? (
+            <div className="document-preview-markdown">
+              {renderMarkdownBlocks(previewText ?? '')}
+            </div>
           ) : (
             <div className="document-preview-fallback">
               <p>This file type cannot be previewed directly in the browser.</p>
@@ -649,11 +850,16 @@ export function WorkspaceModule({
                         <Select options={DOCUMENT_TYPES} />
                       </Form.Item>
                       <label className="workspace-file-picker">
-                        <input key={fileInputKey} type="file" onChange={handleFileChange} />
+                        <input
+                          accept={SUPPORTED_UPLOAD_ACCEPT}
+                          key={fileInputKey}
+                          type="file"
+                          onChange={handleFileChange}
+                        />
                         <span>{uploadFile ? uploadFile.name : 'Choose a file'}</span>
                       </label>
                       <p style={{ fontSize: '12px', color: '#888', margin: '4px 0 0' }}>
-                        Only PDF and image files can be previewed in the browser.
+                        Upload and preview {SUPPORTED_UPLOAD_LABEL} files.
                       </p>
                       <Button
                         block
