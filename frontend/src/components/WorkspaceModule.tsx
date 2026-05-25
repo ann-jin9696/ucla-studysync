@@ -20,6 +20,7 @@ import {
   MagnifyingGlass,
   NotePencil,
   PaperPlaneTilt,
+  Sparkle,
   UsersThree,
 } from '@phosphor-icons/react';
 import type { Group, GroupDetail, GroupDocument } from '../api';
@@ -87,6 +88,16 @@ function formatGroupSizeBucket(value: string) {
   return 'Unknown size';
 }
 
+function documentIndexTag(document: GroupDocument) {
+  if (document.index_status === 'ready') {
+    return { color: 'cyan', label: 'Ready' };
+  }
+  if (document.index_status === 'indexing') {
+    return { color: 'gold', label: 'Indexing' };
+  }
+  return { color: 'red', label: 'Q&A failed' };
+}
+
 function getFileExtension(fileName: string) {
   const extensionStart = fileName.lastIndexOf('.');
   return extensionStart >= 0 ? fileName.slice(extensionStart).toLowerCase() : '';
@@ -123,6 +134,28 @@ function classNames(...names: Array<string | false | null | undefined>) {
 function getActivityTargetId(activityId: string | null | undefined, prefix: string) {
   const match = activityId?.match(new RegExp(`^${prefix}-(\\d+)$`));
   return match ? Number(match[1]) : null;
+}
+
+function DocumentTags({ document }: { document: GroupDocument }) {
+  const indexTag = documentIndexTag(document);
+  return (
+    <div className="document-row-tags">
+      <Tag color="green">{document.document_type}</Tag>
+      <Tag color={indexTag.color}>{indexTag.label}</Tag>
+    </div>
+  );
+}
+
+function DocumentAiSummary({ summary }: { summary: string }) {
+  return (
+    <span className="document-ai-summary">
+      <span className="document-ai-label">
+        <Sparkle size={13} weight="fill" />
+        AI
+      </span>
+      <em>{summary}</em>
+    </span>
+  );
 }
 
 function renderHeading(level: number, content: string, key: string) {
@@ -266,6 +299,10 @@ export function WorkspaceModule({
   >([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [commentText, setCommentText] = useState('');
+  const [qaQuestion, setQaQuestion] = useState('');
+  const [qaAnswer, setQaAnswer] = useState<Awaited<
+    ReturnType<typeof groupApi.askDocuments>
+  > | null>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
   const [loadingGroups, setLoadingGroups] = useState(true);
@@ -273,6 +310,7 @@ export function WorkspaceModule({
   const [loadingComments, setLoadingComments] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [postingComment, setPostingComment] = useState(false);
+  const [askingDocuments, setAskingDocuments] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<GroupDocument | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewText, setPreviewText] = useState<string | null>(null);
@@ -291,37 +329,30 @@ export function WorkspaceModule({
       return;
     }
     const currentPreviewDocument = previewDocument;
-    let objectUrl: string | null = null;
+    const fileUrl = groupApi.documentFileUrl(
+      currentPreviewDocument.group_id,
+      currentPreviewDocument.id,
+    );
     const controller = new AbortController();
 
-    setPreviewUrl(null);
+    setPreviewUrl(fileUrl);
     setPreviewText(null);
     setPreviewError(null);
-    setLoadingPreview(true);
+    setLoadingPreview(isTextPreviewDocument(currentPreviewDocument));
     async function loadPreview() {
+      if (!isTextPreviewDocument(currentPreviewDocument)) {
+        return;
+      }
       try {
-        const response = await fetch(
-          groupApi.documentFileUrl(
-            currentPreviewDocument.group_id,
-            currentPreviewDocument.id,
-          ),
-          {
-            credentials: 'include',
-            signal: controller.signal,
-          },
-        );
+        const response = await fetch(fileUrl, {
+          credentials: 'include',
+          signal: controller.signal,
+        });
         if (!response.ok) {
           throw new Error(`Failed to load file: ${response.status}`);
         }
 
-        if (isTextPreviewDocument(currentPreviewDocument)) {
-          setPreviewText(await response.text());
-          return;
-        }
-
-        const blob = await response.blob();
-        objectUrl = URL.createObjectURL(blob);
-        setPreviewUrl(objectUrl);
+        setPreviewText(await response.text());
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') {
           return;
@@ -337,7 +368,6 @@ export function WorkspaceModule({
 
     return () => {
       controller.abort();
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [previewDocument]);
 
@@ -490,6 +520,21 @@ export function WorkspaceModule({
     }
   }
 
+  async function handleAskDocuments() {
+    if (!selectedGroupId || !qaQuestion.trim()) {
+      return;
+    }
+
+    setAskingDocuments(true);
+    try {
+      setQaAnswer(await groupApi.askDocuments(selectedGroupId, qaQuestion));
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : 'Could not ask documents.');
+    } finally {
+      setAskingDocuments(false);
+    }
+  }
+
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const nextFile = event.target.files?.[0] ?? null;
     if (nextFile && !isSupportedUploadFile(nextFile)) {
@@ -535,6 +580,8 @@ export function WorkspaceModule({
   useEffect(() => {
     setSearchQuery('');
     setCommentText('');
+    setQaQuestion('');
+    setQaAnswer(null);
     setPreviewDocument(null);
     setGroupDetailOpen(false);
     setSelectedGroupDetail(null);
@@ -636,50 +683,71 @@ export function WorkspaceModule({
         title={previewDocument?.title}
         width={860}
       >
-        {previewDocument &&
-          (loadingPreview ? (
-            <Spin />
-          ) : previewError ? (
-            <div className="document-preview-fallback">
-              <p>{previewError}</p>
-              <Button
-                href={previewUrl ?? groupApi.documentFileUrl(previewDocument.group_id, previewDocument.id)}
-                target="_blank"
-                type="primary"
-              >
-                Open file
-              </Button>
-            </div>
-          ) : isImageDocument(previewDocument) ? (
-            <img
-              alt={previewDocument.title}
-              className="document-preview-image"
-              src={previewUrl ?? undefined}
-            />
-          ) : isPdfDocument(previewDocument) ? (
-            <iframe
-              className="document-preview-frame"
-              src={previewUrl ?? undefined}
-              title={previewDocument.title}
-            />
-          ) : isPlainTextDocument(previewDocument) ? (
-            <pre className="document-preview-text">{previewText}</pre>
-          ) : isMarkdownDocument(previewDocument) ? (
-            <div className="document-preview-markdown">
-              {renderMarkdownBlocks(previewText ?? '')}
-            </div>
-          ) : (
-            <div className="document-preview-fallback">
-              <p>This file type cannot be previewed directly in the browser.</p>
-              <Button
-                href={previewUrl ?? undefined}
-                target="_blank"
-                type="primary"
-              >
-                Open file
-              </Button>
-            </div>
-          ))}
+        {previewDocument && (
+          <div className="document-preview-content">
+            {previewDocument.ai_summary && (
+              <div className="document-preview-summary">
+                <DocumentAiSummary summary={previewDocument.ai_summary} />
+              </div>
+            )}
+            {loadingPreview ? (
+              <Spin />
+            ) : previewError ? (
+              <div className="document-preview-fallback">
+                <p>{previewError}</p>
+                <Button href={previewUrl ?? undefined} target="_blank" type="primary">
+                  Open file
+                </Button>
+              </div>
+            ) : isImageDocument(previewDocument) ? (
+              previewUrl ? (
+                <img
+                  alt={previewDocument.title}
+                  className="document-preview-image"
+                  src={previewUrl}
+                />
+              ) : (
+                <Spin />
+              )
+            ) : isPdfDocument(previewDocument) ? (
+              <>
+                {previewUrl ? (
+                  <iframe
+                    className="document-preview-frame"
+                    src={previewUrl}
+                    title={previewDocument.title}
+                  />
+                ) : (
+                  <div className="document-preview-fallback">
+                    <Spin />
+                  </div>
+                )}
+                <div className="document-preview-actions">
+                  <Button href={previewUrl ?? undefined} target="_blank">
+                    Open PDF in new tab
+                  </Button>
+                </div>
+              </>
+            ) : isPlainTextDocument(previewDocument) ? (
+              <pre className="document-preview-text">{previewText}</pre>
+            ) : isMarkdownDocument(previewDocument) ? (
+              <div className="document-preview-markdown">
+                {renderMarkdownBlocks(previewText ?? '')}
+              </div>
+            ) : (
+              <div className="document-preview-fallback">
+                <p>This file type cannot be previewed directly in the browser.</p>
+                <Button
+                  href={previewUrl ?? undefined}
+                  target="_blank"
+                  type="primary"
+                >
+                  Open file
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
       <Drawer
         className="group-detail-drawer"
@@ -828,7 +896,7 @@ export function WorkspaceModule({
                 </Card>
               ) : mode === 'workspace' ? (
                 <div className="workspace-layout workspace-materials-layout">
-                  <Card className="workspace-tool-card">
+                  <Card className="workspace-tool-card upload-material-card">
                     <div className="tool-card-heading">
                       <FileArrowUp size={24} weight="duotone" />
                       <h2>Upload material</h2>
@@ -917,13 +985,70 @@ export function WorkspaceModule({
                                 <small>
                                   {document.file_name} uploaded by {document.uploader_name}
                                 </small>
+                                {document.ai_summary && (
+                                  <DocumentAiSummary summary={document.ai_summary} />
+                                )}
                               </span>
-                              <Tag color="green">{document.document_type}</Tag>
+                              <DocumentTags document={document} />
                             </button>
                           ))}
                         </div>
                       )}
                     </Spin>
+                  </Card>
+
+                  <Card className="workspace-tool-card document-qa-card">
+                    <div className="tool-card-heading">
+                      <ChatCircleText size={24} weight="duotone" />
+                      <h2>Ask documents</h2>
+                      <span className="tool-ai-label">
+                        <Sparkle size={13} weight="fill" />
+                        AI
+                      </span>
+                    </div>
+                    <div className="document-qa-composer">
+                      <Input.TextArea
+                        autoSize={{ minRows: 2, maxRows: 5 }}
+                        onChange={(event) => setQaQuestion(event.target.value)}
+                        onPressEnter={(event) => {
+                          if (!event.shiftKey) {
+                            event.preventDefault();
+                            void handleAskDocuments();
+                          }
+                        }}
+                        placeholder="Ask a question about this group's shared files"
+                        value={qaQuestion}
+                      />
+                      <Button
+                        disabled={!qaQuestion.trim()}
+                        icon={<PaperPlaneTilt size={18} weight="bold" />}
+                        loading={askingDocuments}
+                        onClick={handleAskDocuments}
+                        type="primary"
+                      >
+                        Ask
+                      </Button>
+                    </div>
+                    {qaAnswer ? (
+                      <div className="document-qa-answer">
+                        <p>{qaAnswer.answer}</p>
+                        {qaAnswer.sources.length > 0 && (
+                          <div className="document-qa-sources">
+                            {qaAnswer.sources.map((source, index) => (
+                              <article
+                                className="document-qa-source"
+                                key={`${source.document_id ?? source.file_name}-${index}`}
+                              >
+                                <strong>{source.file_name}</strong>
+                                <span>{source.snippet}</span>
+                              </article>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <Empty description="Ask after at least one document is ready for Q&A" />
+                    )}
                   </Card>
                 </div>
               ) : (
@@ -966,8 +1091,11 @@ export function WorkspaceModule({
                                 <small>
                                   {document.file_name} uploaded by {document.uploader_name}
                                 </small>
+                                {document.ai_summary && (
+                                  <DocumentAiSummary summary={document.ai_summary} />
+                                )}
                               </span>
-                              <Tag color="green">{document.document_type}</Tag>
+                              <DocumentTags document={document} />
                             </button>
                           ))}
                         </div>
