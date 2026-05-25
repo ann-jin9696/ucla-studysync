@@ -282,6 +282,39 @@ def test_user_can_upload_search_and_comment_on_group_document(tmp_path, monkeypa
         assert comments.json()[0]["content"] == "This will help us review for the quiz."
 
 
+def test_document_upload_inserts_non_empty_initial_file_path(tmp_path, monkeypatch):
+    stored_paths: list[str] = []
+    original_stored_file_path = groups.stored_file_path
+
+    def record_stored_file_path(path: Path) -> str:
+        stored_path = original_stored_file_path(path)
+        stored_paths.append(stored_path)
+        return stored_path
+
+    monkeypatch.setattr(groups, "stored_file_path", record_stored_file_path)
+
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client)
+        group_id = create_profile_group(client)
+
+        response = client.post(
+            f"/api/groups/{group_id}/documents",
+            data={"title": "Oracle Upload Notes", "document_type": "notes"},
+            files={
+                "file": (
+                    "oracle-upload.txt",
+                    b"Oracle should not see a null file path.",
+                    "text/plain",
+                )
+            },
+        )
+
+    assert response.status_code == 201
+    assert stored_paths[0]
+    assert "/.upload-" in stored_paths[0]
+    assert stored_paths[-1].endswith("/1-oracle-upload.txt")
+
+
 def test_upload_keeps_document_when_openai_indexing_fails(tmp_path, monkeypatch):
     monkeypatch.setattr(groups, "document_qa_service", FailingIndexDocumentQA())
     with make_client(tmp_path, monkeypatch) as client:

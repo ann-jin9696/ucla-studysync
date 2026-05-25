@@ -1322,6 +1322,7 @@ def upload_document(
     temp_path = group_upload_dir / f".upload-{uuid4().hex}-{clean_name}"
     max_allowed_bytes = min(MAX_DOCUMENT_FILE_BYTES, remaining_group_bytes)
     file_size_bytes = save_upload_with_limit(file, temp_path, max_allowed_bytes)
+    initial_file_path = stored_file_path(temp_path)
 
     saved_path: Path | None = None
     try:
@@ -1344,7 +1345,7 @@ def upload_document(
                 user["id"],
                 " ".join(title.strip().split()),
                 clean_name,
-                "",
+                initial_file_path,
                 file_size_bytes,
                 document_type.strip().lower(),
             ),
