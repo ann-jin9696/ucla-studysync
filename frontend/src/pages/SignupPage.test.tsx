@@ -26,7 +26,7 @@ function renderSignupRoute() {
       <MemoryRouter initialEntries={['/signup']}>
         <Routes>
           <Route path="/signup" element={<SignupPage />} />
-          <Route path="/profile/setup" element={<p>Profile setup screen</p>} />
+          <Route path="/verify-email" element={<p>Verify email screen</p>} />
         </Routes>
       </MemoryRouter>
     </ConfigProvider>,
@@ -58,7 +58,7 @@ describe('SignupPage', () => {
     expect(signup).not.toHaveBeenCalled();
   });
 
-  it('sends successful signups to profile setup', async () => {
+  it('sends successful signups to email verification', async () => {
     signup.mockResolvedValue(undefined);
     renderSignupRoute();
 
@@ -74,7 +74,10 @@ describe('SignupPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /create account/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('Profile setup screen')).toBeInTheDocument();
+      expect(screen.getByText('Verify email screen')).toBeInTheDocument();
     });
+    expect(signup).toHaveBeenCalledWith(
+      expect.objectContaining({ notify_group_application_news: true }),
+    );
   });
 });

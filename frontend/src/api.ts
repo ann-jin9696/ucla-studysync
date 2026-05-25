@@ -2,6 +2,8 @@ export type User = {
   id: number;
   full_name: string;
   email: string;
+  email_verified: boolean;
+  notify_group_application_news: boolean;
   created_at: string;
 };
 
@@ -13,10 +15,20 @@ export type SignupInput = {
   full_name: string;
   email: string;
   password: string;
+  notify_group_application_news: boolean;
 };
 
 export type LoginInput = {
   email: string;
+  password: string;
+};
+
+export type PasswordResetRequestInput = {
+  email: string;
+};
+
+export type PasswordResetConfirmInput = {
+  token: string;
   password: string;
 };
 
@@ -216,6 +228,33 @@ export const authApi = {
   },
   me() {
     return request<AuthResponse>('/api/auth/me');
+  },
+  resendEmailVerification() {
+    return request<void>('/api/auth/email-verification/resend', { method: 'POST' });
+  },
+  confirmEmailVerification(token: string) {
+    return request<AuthResponse>('/api/auth/email-verification/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  },
+  requestPasswordReset(input: PasswordResetRequestInput) {
+    return request<void>('/api/auth/password-reset/request', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+  confirmPasswordReset(input: PasswordResetConfirmInput) {
+    return request<AuthResponse>('/api/auth/password-reset/confirm', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+  updateEmailPreferences(notify_group_application_news: boolean) {
+    return request<AuthResponse>('/api/auth/email-preferences', {
+      method: 'PUT',
+      body: JSON.stringify({ notify_group_application_news }),
+    });
   },
 };
 
