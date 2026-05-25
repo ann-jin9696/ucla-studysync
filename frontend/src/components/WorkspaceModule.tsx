@@ -419,14 +419,21 @@ export function WorkspaceModule({
     }
   }
 
-  async function loadDocuments(nextSearch = searchQuery, groupId = selectedGroupId) {
+  async function loadDocuments(
+    nextSearch = searchQuery,
+    groupId = selectedGroupId,
+    options: { showLoading?: boolean } = {},
+  ) {
     if (!groupId) {
       setDocuments([]);
       setSelectedDocumentId(null);
       return;
     }
 
-    setLoadingDocuments(true);
+    const showLoading = options.showLoading ?? true;
+    if (showLoading) {
+      setLoadingDocuments(true);
+    }
     try {
       const response = await groupApi.listDocuments(groupId, nextSearch);
       setDocuments(response.documents);
@@ -445,7 +452,9 @@ export function WorkspaceModule({
     } catch (error) {
       messageApi.error(error instanceof Error ? error.message : 'Could not load documents.');
     } finally {
-      setLoadingDocuments(false);
+      if (showLoading) {
+        setLoadingDocuments(false);
+      }
     }
   }
 
@@ -485,7 +494,7 @@ export function WorkspaceModule({
         document_type: values.document_type,
         file: uploadFile,
       });
-      messageApi.success('Document uploaded.');
+      messageApi.success('Document uploaded. Q&A indexing will continue in the background.');
       uploadForm.resetFields();
       setUploadFile(null);
       setFileInputKey((key) => key + 1);
@@ -624,6 +633,18 @@ export function WorkspaceModule({
     setSelectedDocumentId(null);
     void loadDocuments('', selectedGroupId);
   }, [selectedGroupId]);
+
+  useEffect(() => {
+    if (!selectedGroupId || !documents.some((document) => document.index_status === 'indexing')) {
+      return;
+    }
+
+    const refreshTimer = window.setInterval(() => {
+      void loadDocuments(searchQuery, selectedGroupId, { showLoading: false });
+    }, 5000);
+
+    return () => window.clearInterval(refreshTimer);
+  }, [documents, searchQuery, selectedGroupId]);
 
   useEffect(() => {
     let shouldIgnore = false;

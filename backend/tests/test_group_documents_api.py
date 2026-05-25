@@ -322,10 +322,15 @@ def test_upload_keeps_document_when_openai_indexing_fails(tmp_path, monkeypatch)
         group_id = create_profile_group(client)
 
         document = upload_document(client, group_id, "Index Failure Notes")
+        listed = client.get(f"/api/groups/{group_id}/documents")
 
-    assert document["index_status"] == "failed"
-    assert "indexing exploded" in document["index_error"]
+    assert document["index_status"] == "indexing"
     assert document["ai_summary"] is None
+    assert listed.status_code == 200
+    indexed_document = listed.json()["documents"][0]
+    assert indexed_document["index_status"] == "failed"
+    assert "indexing exploded" in indexed_document["index_error"]
+    assert indexed_document["ai_summary"] is None
 
 
 def test_upload_stores_ai_document_summary(tmp_path, monkeypatch):
@@ -337,13 +342,15 @@ def test_upload_stores_ai_document_summary(tmp_path, monkeypatch):
         document = upload_document(client, group_id, "Summary Notes")
         listed = client.get(f"/api/groups/{group_id}/documents")
 
-    assert document["index_status"] == "ready"
+    assert document["index_status"] == "indexing"
+    assert document["ai_summary"] is None
+    assert listed.status_code == 200
+    indexed_document = listed.json()["documents"][0]
+    assert indexed_document["index_status"] == "ready"
     assert (
-        document["ai_summary"]
+        indexed_document["ai_summary"]
         == "This document summarizes the setup steps for the study group."
     )
-    assert listed.status_code == 200
-    assert listed.json()["documents"][0]["ai_summary"] == document["ai_summary"]
 
 
 def test_group_document_qa_requires_membership(tmp_path, monkeypatch):
