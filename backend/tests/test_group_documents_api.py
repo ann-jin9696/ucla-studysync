@@ -5,6 +5,12 @@ from fastapi.testclient import TestClient
 
 from app import groups
 from app.main import app
+from app.openai_document_qa import (
+    DocumentQAAnswer,
+    DocumentQAError,
+    DocumentQASourceResult,
+    IndexedDocument,
+)
 
 
 def make_client(tmp_path, monkeypatch) -> TestClient:
@@ -79,6 +85,38 @@ def upload_document(client: TestClient, group_id: int, title: str) -> dict[str, 
     )
     assert response.status_code == 201
     return response.json()
+
+
+class ReadyDocumentQA:
+    def create_vector_store(self, group_id: int, group_name: str) -> str:
+        return f"vs-{group_id}-{group_name}"
+
+    def index_document(self, **_kwargs) -> IndexedDocument:
+        return IndexedDocument(
+            openai_file_id="file-ready",
+            openai_vector_store_file_id="vsf-ready",
+            status="ready",
+        )
+
+    def answer_question(self, **_kwargs) -> DocumentQAAnswer:
+        return DocumentQAAnswer(
+            answer="Use the worksheet to compare setup steps.",
+            sources=[
+                DocumentQASourceResult(
+                    document_id=1,
+                    file_name="week-1-notes.txt",
+                    snippet="Compare setup steps before discussion.",
+                )
+            ],
+        )
+
+    def summarize_document(self, **_kwargs) -> str:
+        return "This document summarizes the setup steps for the study group."
+
+
+class FailingIndexDocumentQA(ReadyDocumentQA):
+    def index_document(self, **_kwargs) -> IndexedDocument:
+        raise DocumentQAError("indexing exploded")
 
 
 def test_group_documents_require_login(tmp_path, monkeypatch):
@@ -182,6 +220,7 @@ def test_user_can_upload_search_and_comment_on_group_document(tmp_path, monkeypa
         assert document["file_name"] == "week-1-notes.pdf"
         assert document["document_type"] == "pdf"
         assert document["uploader_name"] == "Workspace Bruin"
+        assert document["ai_summary"] is None
 
         saved_file = tmp_path / "uploads" / f"group-{group_id}" / "1-week-1-notes.pdf"
         assert saved_file.read_bytes() == b"StudySync group notes"
@@ -217,6 +256,92 @@ def test_user_can_upload_search_and_comment_on_group_document(tmp_path, monkeypa
         assert created_comment.json()["author_name"] == "Workspace Bruin"
         assert comments.status_code == 200
         assert comments.json()[0]["content"] == "This will help us review for the quiz."
+
+
+def test_upload_keeps_document_when_openai_indexing_fails(tmp_path, monkeypatch):
+    monkeypatch.setattr(groups, "document_qa_service", FailingIndexDocumentQA())
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client)
+        group_id = create_profile_group(client)
+
+        document = upload_document(client, group_id, "Index Failure Notes")
+
+    assert document["index_status"] == "failed"
+    assert "indexing exploded" in document["index_error"]
+    assert document["ai_summary"] is None
+
+
+def test_upload_stores_ai_document_summary(tmp_path, monkeypatch):
+    monkeypatch.setattr(groups, "document_qa_service", ReadyDocumentQA())
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client)
+        group_id = create_profile_group(client)
+
+        document = upload_document(client, group_id, "Summary Notes")
+        listed = client.get(f"/api/groups/{group_id}/documents")
+
+    assert document["index_status"] == "ready"
+    assert (
+        document["ai_summary"]
+        == "This document summarizes the setup steps for the study group."
+    )
+    assert listed.status_code == 200
+    assert listed.json()["documents"][0]["ai_summary"] == document["ai_summary"]
+
+
+def test_group_document_qa_requires_membership(tmp_path, monkeypatch):
+    monkeypatch.setattr(groups, "document_qa_service", ReadyDocumentQA())
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client, "owner@g.ucla.edu")
+        group_id = create_profile_group(client)
+        upload_document(client, group_id, "Owner Notes")
+        client.post("/api/auth/logout")
+
+        signup(client, "outsider@g.ucla.edu")
+        response = client.post(
+            f"/api/groups/{group_id}/qa",
+            json={"question": "What should we review?"},
+        )
+
+    assert response.status_code == 403
+
+
+def test_group_document_qa_requires_indexed_documents(tmp_path, monkeypatch):
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client)
+        group_id = create_profile_group(client)
+
+        response = client.post(
+            f"/api/groups/{group_id}/qa",
+            json={"question": "What should we review?"},
+        )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "No indexed documents are ready for Q&A yet."
+
+
+def test_group_document_qa_returns_answer_and_sources(tmp_path, monkeypatch):
+    monkeypatch.setattr(groups, "document_qa_service", ReadyDocumentQA())
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client)
+        group_id = create_profile_group(client)
+        upload_document(client, group_id, "Week 1 Notes")
+
+        response = client.post(
+            f"/api/groups/{group_id}/qa",
+            json={"question": "What should we compare?"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["answer"] == "Use the worksheet to compare setup steps."
+    assert body["sources"] == [
+        {
+            "document_id": 1,
+            "file_name": "week-1-notes.txt",
+            "snippet": "Compare setup steps before discussion.",
+        }
+    ]
 
 
 def test_group_activity_is_scoped_to_current_users_groups(tmp_path, monkeypatch):

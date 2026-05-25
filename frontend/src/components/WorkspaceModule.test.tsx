@@ -7,6 +7,7 @@ import { groupApi } from '../api';
 import { WorkspaceModule } from './WorkspaceModule';
 
 const apiMocks = vi.hoisted(() => ({
+  askDocuments: vi.fn(),
   createComment: vi.fn(),
   documentFileUrl: vi.fn(() => ''),
   getDetail: vi.fn(),
@@ -50,6 +51,9 @@ const documentsByGroup = {
       file_name: 'alpha-notes.pdf',
       file_path: 'uploads/group-1/alpha-notes.pdf',
       document_type: 'notes',
+      index_status: 'ready' as const,
+      index_error: null,
+      ai_summary: 'This one-sentence summary covers Alpha setup notes.',
       uploaded_at: '2026-05-23 20:00:00',
     },
     {
@@ -61,6 +65,9 @@ const documentsByGroup = {
       file_name: 'plain-text-notes.txt',
       file_path: 'uploads/group-1/plain-text-notes.txt',
       document_type: 'notes',
+      index_status: 'ready' as const,
+      index_error: null,
+      ai_summary: null,
       uploaded_at: '2026-05-23 20:01:00',
     },
     {
@@ -72,6 +79,9 @@ const documentsByGroup = {
       file_name: 'markdown-study-guide.md',
       file_path: 'uploads/group-1/markdown-study-guide.md',
       document_type: 'review',
+      index_status: 'ready' as const,
+      index_error: null,
+      ai_summary: null,
       uploaded_at: '2026-05-23 20:02:00',
     },
   ],
@@ -85,6 +95,9 @@ const documentsByGroup = {
       file_name: 'beta-guide.pdf',
       file_path: 'uploads/group-2/beta-guide.pdf',
       document_type: 'review',
+      index_status: 'ready' as const,
+      index_error: null,
+      ai_summary: 'This one-sentence summary covers the Beta guide.',
       uploaded_at: '2026-05-23 20:05:00',
     },
   ],
@@ -178,6 +191,16 @@ describe('WorkspaceModule', () => {
         commentsByDocument[documentId as 10 | 20] ?? [],
     );
     vi.mocked(groupApi.getDetail).mockResolvedValue(betaGroupDetail);
+    vi.mocked(groupApi.askDocuments).mockResolvedValue({
+      answer: 'Alpha notes say to compare setup steps.',
+      sources: [
+        {
+          document_id: 10,
+          file_name: 'alpha-notes.pdf',
+          snippet: 'Compare your setup and bring one question.',
+        },
+      ],
+    });
     vi.mocked(groupApi.documentFileUrl).mockImplementation(
       (groupId: number, documentId: number) =>
         `/api/groups/${groupId}/documents/${documentId}/file`,
@@ -204,6 +227,10 @@ describe('WorkspaceModule', () => {
     renderWorkspace();
 
     expect(await screen.findByText('Alpha Notes')).toBeInTheDocument();
+    expect(
+      screen.getByText('This one-sentence summary covers Alpha setup notes.'),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('AI').length).toBeGreaterThan(0);
     expect(groupApi.listDocuments).toHaveBeenCalledWith(1, '');
 
     await user.click(
@@ -232,6 +259,24 @@ describe('WorkspaceModule', () => {
     await waitFor(() => {
       expect(scrollIntoViewMock).toHaveBeenCalled();
     });
+  });
+
+  it('shows the AI summary on document rows and the preview modal', async () => {
+    const user = userEvent.setup();
+
+    renderWorkspace();
+
+    expect(await screen.findByText('Alpha Notes')).toBeInTheDocument();
+    expect(
+      screen.getByText('This one-sentence summary covers Alpha setup notes.'),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Alpha Notes/ }));
+
+    expect(
+      screen.getAllByText('This one-sentence summary covers Alpha setup notes.'),
+    ).toHaveLength(2);
+    expect(screen.getAllByText('AI').length).toBeGreaterThan(1);
   });
 
   it('scrolls and highlights a comment opened from recent activity', async () => {
@@ -264,6 +309,24 @@ describe('WorkspaceModule', () => {
     expect(screen.getAllByText('Ann').length).toBeGreaterThan(0);
     expect(screen.getByText('Audrey')).toBeInTheDocument();
     expect(groupApi.getDetail).toHaveBeenCalledWith(2);
+  });
+
+  it('asks questions against the selected group documents', async () => {
+    const user = userEvent.setup();
+
+    renderWorkspace();
+
+    await screen.findByText('Alpha Notes');
+    await user.type(
+      screen.getByPlaceholderText("Ask a question about this group's shared files"),
+      'What should we compare?',
+    );
+    await user.click(screen.getByRole('button', { name: 'Ask' }));
+
+    expect(await screen.findByText('Alpha notes say to compare setup steps.')).toBeInTheDocument();
+    expect(screen.getByText('alpha-notes.pdf')).toBeInTheDocument();
+    expect(screen.getByText('Compare your setup and bring one question.')).toBeInTheDocument();
+    expect(groupApi.askDocuments).toHaveBeenCalledWith(1, 'What should we compare?');
   });
 
   it('previews text and markdown documents in the workspace modal', async () => {
