@@ -46,7 +46,11 @@ export function SignupPage() {
           name="full_name"
           rules={[{ required: true, message: 'Please enter your full name.' }]}
         >
-          <Input prefix={<UserCircle size={18} weight="duotone" />} placeholder="Sunny Bruin" />
+          <Input
+            autoComplete="name"
+            prefix={<UserCircle size={18} weight="duotone" />}
+            placeholder="Sunny Bruin"
+          />
         </Form.Item>
         <Form.Item
           label="UCLA email"
@@ -65,7 +69,11 @@ export function SignupPage() {
             },
           ]}
         >
-          <Input prefix={<EnvelopeSimple size={18} weight="duotone" />} placeholder="you@g.ucla.edu" />
+          <Input
+            autoComplete="email"
+            prefix={<EnvelopeSimple size={18} weight="duotone" />}
+            placeholder="you@g.ucla.edu"
+          />
         </Form.Item>
         <Form.Item
           label="Password"
@@ -76,6 +84,7 @@ export function SignupPage() {
           ]}
         >
           <Input.Password
+            autoComplete="new-password"
             prefix={<LockKey size={18} weight="duotone" />}
             placeholder="At least 8 characters"
           />
