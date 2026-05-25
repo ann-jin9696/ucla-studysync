@@ -153,7 +153,17 @@ def get_group(db: sqlite3.Connection, group_id: int) -> sqlite3.Row:
         JOIN courses ON courses.id = groups.course_id
         LEFT JOIN group_members ON group_members.group_id = groups.id
         WHERE groups.id = ?
-        GROUP BY groups.id
+        GROUP BY
+            groups.id,
+            groups.name,
+            groups.course_id,
+            courses.course_code,
+            courses.course_quarter,
+            courses.lecture_number,
+            groups.created_by_user_id,
+            groups.openai_vector_store_id,
+            groups.created_at,
+            groups.updated_at
         """,
         (group_id,),
     ).fetchone()
@@ -186,7 +196,18 @@ def get_group_with_owner(db: sqlite3.Connection, group_id: int) -> sqlite3.Row:
         JOIN users owner ON owner.id = groups.created_by_user_id
         LEFT JOIN group_members ON group_members.group_id = groups.id
         WHERE groups.id = ?
-        GROUP BY groups.id
+        GROUP BY
+            groups.id,
+            groups.name,
+            groups.course_id,
+            courses.course_code,
+            courses.course_quarter,
+            courses.lecture_number,
+            groups.created_by_user_id,
+            groups.openai_vector_store_id,
+            owner.full_name,
+            groups.created_at,
+            groups.updated_at
         """,
         (group_id,),
     ).fetchone()
@@ -548,7 +569,16 @@ def list_my_groups(
           ON current_membership.group_id = groups.id
          AND current_membership.user_id = ?
         LEFT JOIN group_members all_members ON all_members.group_id = groups.id
-        GROUP BY groups.id
+        GROUP BY
+            groups.id,
+            groups.name,
+            groups.course_id,
+            courses.course_code,
+            courses.course_quarter,
+            courses.lecture_number,
+            groups.created_by_user_id,
+            groups.created_at,
+            groups.updated_at
         ORDER BY groups.updated_at DESC, groups.id DESC
         """,
         (user["id"],),
