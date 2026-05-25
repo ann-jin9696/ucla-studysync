@@ -141,6 +141,9 @@ export type GroupDocument = {
   file_name: string;
   file_path: string;
   document_type: string;
+  index_status: 'indexing' | 'ready' | 'failed';
+  index_error: string | null;
+  ai_summary: string | null;
   uploaded_at: string;
 };
 
@@ -156,6 +159,17 @@ export type GroupComment = {
   author_name: string;
   content: string;
   created_at: string;
+};
+
+export type DocumentQASource = {
+  document_id: number | null;
+  file_name: string;
+  snippet: string;
+};
+
+export type DocumentQAResponse = {
+  answer: string;
+  sources: DocumentQASource[];
 };
 
 export type GroupActivity = {
@@ -375,6 +389,12 @@ export const groupApi = {
         body: JSON.stringify({ content }),
       },
     );
+  },
+  askDocuments(groupId: number, question: string) {
+    return request<DocumentQAResponse>(`/api/groups/${groupId}/qa`, {
+      method: 'POST',
+      body: JSON.stringify({ question }),
+    });
   },
 };
 
