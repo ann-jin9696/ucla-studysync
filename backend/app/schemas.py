@@ -155,10 +155,12 @@ class DocumentResponse(BaseModel):
     title: str
     file_name: str
     file_path: str
+    file_size_bytes: int
     document_type: str
     index_status: str
     index_error: str | None
     ai_summary: str | None
+    can_delete: bool = False
     uploaded_at: str
 
 

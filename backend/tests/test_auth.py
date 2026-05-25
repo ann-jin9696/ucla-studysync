@@ -25,7 +25,7 @@ def test_signup_creates_ucla_user_and_sets_cookie(tmp_path, monkeypatch):
         response = client.post("/api/auth/signup", json=signup_payload())
 
     assert response.status_code == 201
-    assert response.json()["user"]["email"] == "bruin@g.ucla.edu"
+    assert response.json()["user"]["email"] == "bruin@ucla.edu"
     assert response.json()["user"]["email_verified"] is False
     assert response.json()["user"]["notify_group_application_news"] is True
     assert SESSION_COOKIE_NAME in response.cookies
@@ -60,6 +60,25 @@ def test_signup_rejects_duplicate_email_case_insensitively(tmp_path, monkeypatch
 
     assert first.status_code == 201
     assert duplicate.status_code == 409
+
+
+def test_g_ucla_email_is_ucla_alias_for_signup_and_login(tmp_path, monkeypatch):
+    with make_client(tmp_path, monkeypatch) as client:
+        signup = client.post("/api/auth/signup", json=signup_payload("bruin@g.ucla.edu"))
+        client.post("/api/auth/logout")
+        duplicate = client.post(
+            "/api/auth/signup",
+            json=signup_payload("bruin@ucla.edu"),
+        )
+        login = client.post(
+            "/api/auth/login",
+            json={"email": "bruin@g.ucla.edu", "password": "classroom123"},
+        )
+
+    assert signup.status_code == 201
+    assert signup.json()["user"]["email"] == "bruin@ucla.edu"
+    assert duplicate.status_code == 409
+    assert login.status_code == 200
 
 
 def test_login_succeeds_and_fails_with_expected_credentials(tmp_path, monkeypatch):

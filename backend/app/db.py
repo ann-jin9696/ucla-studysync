@@ -11,12 +11,12 @@ from .oracle_db import OracleConnection, get_oracle_connection
 DEFAULT_LEGACY_QUARTER = "Spring 2026"
 DEFAULT_LEGACY_LECTURE = 1
 LEGACY_DEMO_USER_RENAMES = (
-    ("alice.seed@g.ucla.edu", "Alice", "Ann"),
-    ("iris.seed.demo@g.ucla.edu", "Iris Seed", "Taylor"),
-    ("jordan.seed@g.ucla.edu", "Jordan", "Victor"),
-    ("maya.seed.demo@g.ucla.edu", "Maya Seed", "Fahd"),
-    ("neel.seed@g.ucla.edu", "Neel", "Audrey"),
-    ("noah.seed.demo@g.ucla.edu", "Noah Seed", "Tobias"),
+    ("alice.seed@ucla.edu", "Alice", "Ann"),
+    ("iris.seed.demo@ucla.edu", "Iris Seed", "Taylor"),
+    ("jordan.seed@ucla.edu", "Jordan", "Victor"),
+    ("maya.seed.demo@ucla.edu", "Maya Seed", "Fahd"),
+    ("neel.seed@ucla.edu", "Neel", "Audrey"),
+    ("noah.seed.demo@ucla.edu", "Noah Seed", "Tobias"),
 )
 LEGACY_WORKSPACE_GROUP_PREFIX = "Workspace Switch"
 MOCK_COURSE_OFFERINGS = (
@@ -30,25 +30,25 @@ MOCK_COURSE_OFFERINGS = (
 MOCK_USER_PASSWORD_HASH = (
     "$2b$12$KZPJPAmZ6AJqh3BTSnWbgOLa/a6DvvK.ONLsUyEXkceJpU3xG1tMi"
 )
-MOCK_GROUP_OWNER_EMAIL = "alice.seed@g.ucla.edu"
+MOCK_GROUP_OWNER_EMAIL = "alice.seed@ucla.edu"
 MOCK_GROUP_USERS = (
     (
         "Ann",
-        "alice.seed@g.ucla.edu",
+        "alice.seed@ucla.edu",
         '["project_work", "notes_sharing"]',
         "moderate",
         4,
     ),
     (
         "Audrey",
-        "neel.seed@g.ucla.edu",
+        "neel.seed@ucla.edu",
         '["homework_help", "concept_review"]',
         "relaxed",
         6,
     ),
     (
         "Victor",
-        "jordan.seed@g.ucla.edu",
+        "jordan.seed@ucla.edu",
         '["exam_prep", "homework_help"]',
         "intensive",
         8,
@@ -59,7 +59,7 @@ MOCK_GROUP_DOCUMENTS = (
         "title": "Midterm Review Notes",
         "file_name": "midterm-review-notes.md",
         "document_type": "notes",
-        "uploader_email": "alice.seed@g.ucla.edu",
+        "uploader_email": "alice.seed@ucla.edu",
         "uploaded_at": "datetime('now', '-1 hour')",
         "content": "# Midterm Review Notes\n\nKey formulas, practice prompts, and review checkpoints for the group.\n",
     },
@@ -67,7 +67,7 @@ MOCK_GROUP_DOCUMENTS = (
         "title": "Week 5 Worksheet",
         "file_name": "week-5-worksheet.txt",
         "document_type": "worksheet",
-        "uploader_email": "neel.seed@g.ucla.edu",
+        "uploader_email": "neel.seed@ucla.edu",
         "uploaded_at": "datetime('now', '-35 minutes')",
         "content": "Week 5 worksheet\n\n1. Compare your setup.\n2. Mark confusing steps.\n3. Bring one question to discussion.\n",
     },
@@ -75,13 +75,13 @@ MOCK_GROUP_DOCUMENTS = (
 MOCK_GROUP_COMMENTS = (
     {
         "document_title": "Midterm Review Notes",
-        "author_email": "jordan.seed@g.ucla.edu",
+        "author_email": "jordan.seed@ucla.edu",
         "content": "I added a few exam-style questions to review together.",
         "created_at": "datetime('now', '-20 minutes')",
     },
     {
         "document_title": "Week 5 Worksheet",
-        "author_email": "alice.seed@g.ucla.edu",
+        "author_email": "alice.seed@ucla.edu",
         "content": "Let's use this as our warm-up before the next group session.",
         "created_at": "datetime('now', '-10 minutes')",
     },
@@ -569,6 +569,15 @@ def ensure_document_columns(connection: Connection) -> None:
             connection.execute("ALTER TABLE documents ADD (ai_summary CLOB)")
         else:
             connection.execute("ALTER TABLE documents ADD COLUMN ai_summary TEXT")
+    if "file_size_bytes" not in document_columns:
+        if using_oracle():
+            connection.execute(
+                "ALTER TABLE documents ADD (file_size_bytes INTEGER DEFAULT 0 NOT NULL)"
+            )
+        else:
+            connection.execute(
+                "ALTER TABLE documents ADD COLUMN file_size_bytes INTEGER NOT NULL DEFAULT 0"
+            )
 
 
 def create_course_group_tables(connection: Connection) -> None:
@@ -738,6 +747,7 @@ def create_course_group_tables(connection: Connection) -> None:
             file_name TEXT NOT NULL,
             file_path TEXT NOT NULL,
             document_type TEXT NOT NULL,
+            file_size_bytes INTEGER NOT NULL DEFAULT 0 CHECK (file_size_bytes >= 0),
             openai_file_id TEXT,
             openai_vector_store_file_id TEXT,
             index_status TEXT NOT NULL DEFAULT 'failed',
@@ -757,6 +767,7 @@ def create_course_group_tables(connection: Connection) -> None:
             file_name VARCHAR2(255) NOT NULL,
             file_path VARCHAR2(1000) NOT NULL,
             document_type VARCHAR2(80) NOT NULL,
+            file_size_bytes INTEGER DEFAULT 0 NOT NULL CHECK (file_size_bytes >= 0),
             openai_file_id VARCHAR2(255),
             openai_vector_store_file_id VARCHAR2(255),
             index_status VARCHAR2(40) DEFAULT 'failed' NOT NULL,
@@ -1007,6 +1018,45 @@ def merge_user_rows(
         (target_user_id, source_user_id),
     )
     connection.execute("DELETE FROM users WHERE id = ?", (source_user_id,))
+
+
+def canonical_ucla_alias_email(email: str) -> str:
+    normalized = email.strip().lower()
+    if "@" not in normalized:
+        return normalized
+    local_part, domain = normalized.rsplit("@", 1)
+    if domain == "g.ucla.edu":
+        return f"{local_part}@ucla.edu"
+    return normalized
+
+
+def normalize_ucla_email_aliases(connection: Connection) -> None:
+    users = connection.execute(
+        "SELECT id, email FROM users ORDER BY id ASC"
+    ).fetchall()
+    users_by_canonical_email: dict[str, list[object]] = {}
+    for user in users:
+        canonical_email = canonical_ucla_alias_email(str(user["email"]))
+        users_by_canonical_email.setdefault(canonical_email, []).append(user)
+
+    for canonical_email, matching_users in users_by_canonical_email.items():
+        target_user = next(
+            (
+                user
+                for user in matching_users
+                if str(user["email"]).strip().lower() == canonical_email
+            ),
+            matching_users[0],
+        )
+        target_user_id = int(target_user["id"])
+        for source_user in matching_users:
+            source_user_id = int(source_user["id"])
+            if source_user_id != target_user_id:
+                merge_user_rows(connection, source_user_id, target_user_id)
+        connection.execute(
+            "UPDATE users SET email = ? WHERE id = ?",
+            (canonical_email, target_user_id),
+        )
 
 
 def normalize_legacy_demo_data(connection: sqlite3.Connection) -> None:
@@ -1299,7 +1349,7 @@ def seed_mock_group_content(connection: sqlite3.Connection) -> None:
             connection,
             int(course["id"]),
             str(course["course_code"]),
-            seed_user_ids["alice.seed@g.ucla.edu"],
+            seed_user_ids[MOCK_GROUP_OWNER_EMAIL],
         )
         seed_group_members(connection, group_id, int(course["id"]), seed_user_ids)
         documents_by_title = {
@@ -1546,6 +1596,7 @@ def init_db() -> None:
 
         create_course_group_tables(connection)
         create_indexes(connection)
+        normalize_ucla_email_aliases(connection)
         seed_mock_courses(connection)
         restore_legacy_user_courses(connection, legacy_courses)
         normalize_legacy_demo_data(connection)

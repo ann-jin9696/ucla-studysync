@@ -1,12 +1,22 @@
 from __future__ import annotations
 
 import re
-import shutil
 import sqlite3
 from mimetypes import guess_type
 from pathlib import Path
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.responses import FileResponse
 
 from .db import get_db
@@ -52,6 +62,9 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 UPLOAD_DIR = BACKEND_DIR / "data" / "uploads"
 SUPPORTED_DOCUMENT_EXTENSIONS = {".pdf", ".png", ".jpg", ".txt", ".md"}
 SUPPORTED_DOCUMENT_EXTENSION_LABEL = "PDF, PNG, JPG, TXT, or MD"
+MAX_DOCUMENT_FILE_BYTES = 50 * 1024 * 1024
+MAX_GROUP_STORAGE_BYTES = 2 * 1024 * 1024 * 1024
+UPLOAD_CHUNK_BYTES = 1024 * 1024
 
 
 def clean_file_name(file_name: str) -> str:
@@ -72,6 +85,14 @@ def require_supported_document_file(file_name: str) -> None:
         )
 
 
+def format_file_size(size_bytes: int) -> str:
+    if size_bytes >= 1024 * 1024 * 1024:
+        size = size_bytes / (1024 * 1024 * 1024)
+        return f"{size:.0f} GB" if size.is_integer() else f"{size:.1f} GB"
+    size = size_bytes / (1024 * 1024)
+    return f"{size:.0f} MB" if size.is_integer() else f"{size:.1f} MB"
+
+
 def stored_file_path(path: Path) -> str:
     try:
         return str(path.relative_to(BACKEND_DIR))
@@ -84,6 +105,56 @@ def resolve_stored_file_path(file_path: str) -> Path:
     if path.is_absolute():
         return path
     return BACKEND_DIR / path
+
+
+def file_size_for_document(row: sqlite3.Row) -> int:
+    stored_size = int(row["file_size_bytes"] or 0)
+    if stored_size > 0:
+        return stored_size
+
+    file_path = resolve_stored_file_path(str(row["file_path"]))
+    if file_path.exists() and file_path.is_file():
+        return file_path.stat().st_size
+    return 0
+
+
+def get_group_storage_usage(db: sqlite3.Connection, group_id: int) -> int:
+    rows = db.execute(
+        """
+        SELECT file_path, file_size_bytes
+        FROM documents
+        WHERE group_id = ?
+        """,
+        (group_id,),
+    ).fetchall()
+    return sum(file_size_for_document(row) for row in rows)
+
+
+def save_upload_with_limit(
+    file: UploadFile,
+    destination: Path,
+    max_size_bytes: int,
+) -> int:
+    bytes_written = 0
+    try:
+        with destination.open("wb") as output:
+            while chunk := file.file.read(UPLOAD_CHUNK_BYTES):
+                bytes_written += len(chunk)
+                if bytes_written > max_size_bytes:
+                    raise HTTPException(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        detail=(
+                            "Please upload a smaller file. The per-file limit is "
+                            f"{format_file_size(MAX_DOCUMENT_FILE_BYTES)}, and each "
+                            "group can store up to "
+                            f"{format_file_size(MAX_GROUP_STORAGE_BYTES)}."
+                        ),
+                    )
+                output.write(chunk)
+    except Exception:
+        destination.unlink(missing_ok=True)
+        raise
+    return bytes_written
 
 
 def get_owned_user_course(
@@ -337,6 +408,19 @@ def index_saved_document(
     db.commit()
 
 
+def forget_indexed_document(group: sqlite3.Row, document: sqlite3.Row) -> None:
+    try:
+        document_qa_service.delete_document(
+            vector_store_id=group["openai_vector_store_id"],
+            vector_store_file_id=document["openai_vector_store_file_id"],
+            openai_file_id=document["openai_file_id"],
+        )
+    except (AttributeError, DocumentQAUnavailable, DocumentQAError):
+        return
+    except Exception:
+        return
+
+
 def ensure_document_in_group(
     db: sqlite3.Connection,
     group_id: int,
@@ -351,6 +435,7 @@ def ensure_document_in_group(
             documents.title,
             documents.file_name,
             documents.file_path,
+            documents.file_size_bytes,
             documents.document_type,
             documents.openai_file_id,
             documents.openai_vector_store_file_id,
@@ -443,7 +528,18 @@ def serialize_join_request(row: sqlite3.Row) -> JoinRequestResponse:
     )
 
 
-def serialize_document(row: sqlite3.Row) -> DocumentResponse:
+def user_can_delete_document(
+    document: sqlite3.Row,
+    group: sqlite3.Row,
+    user_id: int,
+) -> bool:
+    return (
+        int(document["uploader_id"]) == user_id
+        or int(group["created_by_user_id"]) == user_id
+    )
+
+
+def serialize_document(row: sqlite3.Row, can_delete: bool = False) -> DocumentResponse:
     return DocumentResponse(
         id=row["id"],
         group_id=row["group_id"],
@@ -452,10 +548,12 @@ def serialize_document(row: sqlite3.Row) -> DocumentResponse:
         title=row["title"],
         file_name=row["file_name"],
         file_path=row["file_path"],
+        file_size_bytes=row["file_size_bytes"],
         document_type=row["document_type"],
         index_status=row["index_status"],
         index_error=row["index_error"],
         ai_summary=row["ai_summary"],
+        can_delete=can_delete,
         uploaded_at=row["uploaded_at"],
     )
 
@@ -1145,7 +1243,7 @@ def list_documents(
     db: sqlite3.Connection = Depends(get_db),
     user: sqlite3.Row = Depends(get_current_user),
 ) -> GroupDocumentsResponse:
-    require_group_member(db, group_id, int(user["id"]))
+    group = require_group_member(db, group_id, int(user["id"]))
     search_term = f"%{search.strip()}%"
 
     rows = db.execute(
@@ -1158,6 +1256,7 @@ def list_documents(
             documents.title,
             documents.file_name,
             documents.file_path,
+            documents.file_size_bytes,
             documents.document_type,
             documents.openai_file_id,
             documents.openai_vector_store_file_id,
@@ -1181,7 +1280,13 @@ def list_documents(
 
     return GroupDocumentsResponse(
         group_id=group_id,
-        documents=[serialize_document(row) for row in rows],
+        documents=[
+            serialize_document(
+                row,
+                can_delete=user_can_delete_document(row, group, int(user["id"])),
+            )
+            for row in rows
+        ],
     )
 
 
@@ -1201,47 +1306,70 @@ def upload_document(
     require_group_member(db, group_id, int(user["id"]))
     clean_name = clean_file_name(file.filename or "uploaded-file")
     require_supported_document_file(clean_name)
+    group_storage_usage = get_group_storage_usage(db, group_id)
+    remaining_group_bytes = MAX_GROUP_STORAGE_BYTES - group_storage_usage
+    if remaining_group_bytes <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=(
+                "This group has reached its "
+                f"{format_file_size(MAX_GROUP_STORAGE_BYTES)} file storage limit."
+            ),
+        )
+
     group_upload_dir = UPLOAD_DIR / f"group-{group_id}"
     group_upload_dir.mkdir(parents=True, exist_ok=True)
+    temp_path = group_upload_dir / f".upload-{uuid4().hex}-{clean_name}"
+    max_allowed_bytes = min(MAX_DOCUMENT_FILE_BYTES, remaining_group_bytes)
+    file_size_bytes = save_upload_with_limit(file, temp_path, max_allowed_bytes)
 
-    cursor = db.execute(
-        """
-        INSERT INTO documents (
-            group_id,
-            uploader_id,
-            title,
-            file_name,
-            file_path,
-            document_type,
-            index_status
+    saved_path: Path | None = None
+    try:
+        cursor = db.execute(
+            """
+            INSERT INTO documents (
+                group_id,
+                uploader_id,
+                title,
+                file_name,
+                file_path,
+                file_size_bytes,
+                document_type,
+                index_status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'indexing')
+            """,
+            (
+                group_id,
+                user["id"],
+                " ".join(title.strip().split()),
+                clean_name,
+                "",
+                file_size_bytes,
+                document_type.strip().lower(),
+            ),
         )
-        VALUES (?, ?, ?, ?, ?, ?, 'indexing')
-        """,
-        (
-            group_id,
-            user["id"],
-            " ".join(title.strip().split()),
-            clean_name,
-            "",
-            document_type.strip().lower(),
-        ),
-    )
-    document_id = int(cursor.lastrowid)
-    saved_name = f"{document_id}-{clean_name}"
-    saved_path = group_upload_dir / saved_name
+        document_id = int(cursor.lastrowid)
+        saved_name = f"{document_id}-{clean_name}"
+        saved_path = group_upload_dir / saved_name
+        temp_path.replace(saved_path)
 
-    with saved_path.open("wb") as output:
-        shutil.copyfileobj(file.file, output)
+        db.execute(
+            "UPDATE documents SET file_path = ? WHERE id = ?",
+            (stored_file_path(saved_path), document_id),
+        )
+        db.execute(
+            "UPDATE groups SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (group_id,),
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        temp_path.unlink(missing_ok=True)
+        if saved_path is not None:
+            saved_path.unlink(missing_ok=True)
+        raise
 
-    db.execute(
-        "UPDATE documents SET file_path = ? WHERE id = ?",
-        (stored_file_path(saved_path), document_id),
-    )
-    db.execute(
-        "UPDATE groups SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        (group_id,),
-    )
-    db.commit()
     index_saved_document(db, group_id, document_id, clean_name, saved_path)
 
     row = db.execute(
@@ -1254,6 +1382,7 @@ def upload_document(
             documents.title,
             documents.file_name,
             documents.file_path,
+            documents.file_size_bytes,
             documents.document_type,
             documents.openai_file_id,
             documents.openai_vector_store_file_id,
@@ -1268,7 +1397,45 @@ def upload_document(
         (document_id,),
     ).fetchone()
 
-    return serialize_document(row)
+    return serialize_document(row, can_delete=True)
+
+
+@router.delete(
+    "/{group_id}/documents/{document_id}",
+    response_class=Response,
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_document(
+    group_id: int,
+    document_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+    user: sqlite3.Row = Depends(get_current_user),
+) -> Response:
+    group = require_group_member(db, group_id, int(user["id"]))
+    document = ensure_document_in_group(db, group_id, document_id)
+    user_id = int(user["id"])
+    if not user_can_delete_document(document, group, user_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the file owner or group owner can delete this file.",
+        )
+
+    file_path = resolve_stored_file_path(document["file_path"])
+    forget_indexed_document(group, document)
+
+    try:
+        db.execute("DELETE FROM documents WHERE id = ?", (document_id,))
+        db.execute(
+            "UPDATE groups SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (group_id,),
+        )
+        db.commit()
+    except sqlite3.Error:
+        db.rollback()
+        raise
+
+    file_path.unlink(missing_ok=True)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/{group_id}/qa", response_model=DocumentQAResponse)

@@ -16,7 +16,13 @@ EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def normalize_email(email: str) -> str:
-    return email.strip().lower()
+    normalized = email.strip().lower()
+    if "@" not in normalized:
+        return normalized
+    local_part, domain = normalized.rsplit("@", 1)
+    if domain == "g.ucla.edu":
+        return f"{local_part}@ucla.edu"
+    return normalized
 
 
 def is_ucla_email(email: str) -> bool:

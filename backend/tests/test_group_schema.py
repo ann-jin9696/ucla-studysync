@@ -148,7 +148,7 @@ def test_default_mock_seed_data_is_uniform_and_cross_table_valid(
         """
         SELECT id, full_name
         FROM users
-        WHERE email LIKE '%.seed@g.ucla.edu'
+        WHERE email LIKE '%.seed@ucla.edu'
         """
     ).fetchall()
     seed_documents = connection.execute(
@@ -196,7 +196,7 @@ def test_default_mock_seed_data_is_uniform_and_cross_table_valid(
             FROM group_members
             JOIN users ON users.id = group_members.user_id
             WHERE group_members.group_id = ?
-              AND users.email LIKE '%.seed@g.ucla.edu'
+              AND users.email LIKE '%.seed@ucla.edu'
             """,
             (group["id"],),
         ).fetchone()[0]
@@ -234,7 +234,7 @@ def test_default_mock_seed_data_is_uniform_and_cross_table_valid(
         {
             row["email"]: row["id"]
             for row in connection.execute(
-                "SELECT id, email FROM users WHERE email LIKE '%.seed@g.ucla.edu'"
+                "SELECT id, email FROM users WHERE email LIKE '%.seed@ucla.edu'"
             ).fetchall()
         },
     )
@@ -293,12 +293,12 @@ def test_legacy_demo_names_are_normalized_on_startup(tmp_path, monkeypatch):
             SELECT email, full_name
             FROM users
             WHERE email IN (
-                'alice.seed@g.ucla.edu',
-                'iris.seed.demo@g.ucla.edu',
-                'jordan.seed@g.ucla.edu',
-                'maya.seed.demo@g.ucla.edu',
-                'neel.seed@g.ucla.edu',
-                'noah.seed.demo@g.ucla.edu'
+                'alice.seed@ucla.edu',
+                'iris.seed.demo@ucla.edu',
+                'jordan.seed@ucla.edu',
+                'maya.seed.demo@ucla.edu',
+                'neel.seed@ucla.edu',
+                'noah.seed.demo@ucla.edu'
             )
             """
         ).fetchall()
@@ -331,12 +331,12 @@ def test_legacy_demo_names_are_normalized_on_startup(tmp_path, monkeypatch):
     ).fetchone()[0]
 
     assert renamed_users == {
-        "alice.seed@g.ucla.edu": "Ann",
-        "iris.seed.demo@g.ucla.edu": "Taylor",
-        "jordan.seed@g.ucla.edu": "Victor",
-        "maya.seed.demo@g.ucla.edu": "Fahd",
-        "neel.seed@g.ucla.edu": "Audrey",
-        "noah.seed.demo@g.ucla.edu": "Tobias",
+        "alice.seed@ucla.edu": "Ann",
+        "iris.seed.demo@ucla.edu": "Taylor",
+        "jordan.seed@ucla.edu": "Victor",
+        "maya.seed.demo@ucla.edu": "Fahd",
+        "neel.seed@ucla.edu": "Audrey",
+        "noah.seed.demo@ucla.edu": "Tobias",
     }
     assert renamed_group is not None
     assert legacy_user_count == 0

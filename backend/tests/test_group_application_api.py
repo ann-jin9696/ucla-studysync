@@ -111,10 +111,10 @@ def test_application_news_emails_notify_reviewer_and_applicant(tmp_path, monkeyp
         client.post(f"/api/groups/{group_id}/join-requests/{join_request['id']}/approve")
 
     assert reviewer_emails == [
-        ("owner@g.ucla.edu", "Owner Bruin", "Applicant Bruin", "Project Studio")
+        ("owner@ucla.edu", "Owner Bruin", "Applicant Bruin", "Project Studio")
     ]
     assert decision_emails == [
-        ("applicant@g.ucla.edu", "Applicant Bruin", "Project Studio", "approved")
+        ("applicant@ucla.edu", "Applicant Bruin", "Project Studio", "approved")
     ]
 
 
