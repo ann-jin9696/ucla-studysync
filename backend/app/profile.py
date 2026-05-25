@@ -414,7 +414,7 @@ def update_my_profile(
             )
 
         db.execute("DELETE FROM user_course WHERE user_id = ?", (user_id,))
-        for course, course_id in zip(values["courses"], course_ids, strict=True):
+        for course, course_id in zip(values["courses"], course_ids):
             db.execute(
                 """
                 INSERT INTO user_course (
