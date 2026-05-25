@@ -57,14 +57,22 @@ export function LoginPage() {
             { type: 'email', message: 'Please enter a valid email address.' },
           ]}
         >
-          <Input prefix={<EnvelopeSimple size={18} weight="duotone" />} placeholder="you@g.ucla.edu" />
+          <Input
+            autoComplete="email"
+            prefix={<EnvelopeSimple size={18} weight="duotone" />}
+            placeholder="you@g.ucla.edu"
+          />
         </Form.Item>
         <Form.Item
           label="Password"
           name="password"
           rules={[{ required: true, message: 'Please enter your password.' }]}
         >
-          <Input.Password prefix={<LockKey size={18} weight="duotone" />} placeholder="Your password" />
+          <Input.Password
+            autoComplete="current-password"
+            prefix={<LockKey size={18} weight="duotone" />}
+            placeholder="Your password"
+          />
         </Form.Item>
         <Button type="primary" htmlType="submit" block loading={submitting}>
           Log in
