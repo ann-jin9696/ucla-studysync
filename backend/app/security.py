@@ -77,7 +77,17 @@ def get_current_user(
         ) from None
 
     user = db.execute(
-        "SELECT id, full_name, email, created_at FROM users WHERE id = ?",
+        """
+        SELECT
+            id,
+            full_name,
+            email,
+            email_verified,
+            notify_group_application_news,
+            created_at
+        FROM users
+        WHERE id = ?
+        """,
         (user_id,),
     ).fetchone()
     if user is None:

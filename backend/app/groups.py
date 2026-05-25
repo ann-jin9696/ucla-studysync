@@ -10,6 +10,10 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from fastapi.responses import FileResponse
 
 from .db import get_db
+from .email import (
+    send_group_application_decision_email,
+    send_group_application_reviewer_email,
+)
 from .group_metrics import (
     as_list,
     average_pace,
@@ -345,6 +349,25 @@ def serialize_pending_application(row: sqlite3.Row) -> PendingApplicationRespons
     )
 
 
+def get_user_for_email(db: sqlite3.Connection, user_id: int) -> sqlite3.Row | None:
+    return db.execute(
+        """
+        SELECT
+            id,
+            full_name,
+            email,
+            notify_group_application_news
+        FROM users
+        WHERE id = ?
+        """,
+        (user_id,),
+    ).fetchone()
+
+
+def user_allows_group_application_email(user: sqlite3.Row | None) -> bool:
+    return bool(user is not None and user["notify_group_application_news"])
+
+
 @router.get("/join-requests/pending", response_model=list[PendingApplicationResponse])
 def list_pending_applications(
     db: sqlite3.Connection = Depends(get_db),
@@ -630,6 +653,14 @@ def apply_to_group(
         """,
         (cursor.lastrowid,),
     ).fetchone()
+    reviewer = get_user_for_email(db, int(group["created_by_user_id"]))
+    if user_allows_group_application_email(reviewer):
+        send_group_application_reviewer_email(
+            reviewer["email"],
+            reviewer["full_name"],
+            user["full_name"],
+            group["name"],
+        )
     return serialize_join_request(row)
 
 
@@ -887,6 +918,14 @@ def approve_join_request(
         """,
         (request_id,),
     ).fetchone()
+    applicant = get_user_for_email(db, int(join_request["user_id"]))
+    if user_allows_group_application_email(applicant):
+        send_group_application_decision_email(
+            applicant["email"],
+            applicant["full_name"],
+            group["name"],
+            "approved",
+        )
     return serialize_join_request(row)
 
 
@@ -929,6 +968,15 @@ def reject_join_request(
         """,
         (join_request["id"],),
     ).fetchone()
+    group = get_group(db, group_id)
+    applicant = get_user_for_email(db, int(join_request["user_id"]))
+    if user_allows_group_application_email(applicant):
+        send_group_application_decision_email(
+            applicant["email"],
+            applicant["full_name"],
+            group["name"],
+            "rejected",
+        )
     return serialize_join_request(row)
 
 

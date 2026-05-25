@@ -1,7 +1,8 @@
-import { Alert, Button, message } from 'antd';
-import { ArrowLeft, SignOut, UserCircle } from '@phosphor-icons/react';
+import { Alert, Button, Switch, message } from 'antd';
+import { ArrowLeft, BellRinging, SignOut, UserCircle } from '@phosphor-icons/react';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { authApi } from '../api';
 import { useAuth } from '../components/AuthProvider';
 import { ProfileForm } from '../components/ProfileForm';
 import { useProfile } from '../components/ProfileProvider';
@@ -11,10 +12,11 @@ import studySyncLogo from '../assets/studysync-logo.png';
 
 export function ProfilePage() {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, refreshUser, user } = useAuth();
   const { profile, error, saveProfile } = useProfile();
   const [messageApi, contextHolder] = message.useMessage();
   const [submitting, setSubmitting] = useState(false);
+  const [savingEmailPreference, setSavingEmailPreference] = useState(false);
 
   const activeProfile = profile ?? EMPTY_PROFILE;
   const missingSections = useMemo(
@@ -39,6 +41,21 @@ export function ProfilePage() {
       messageApi.error(err instanceof Error ? err.message : 'Could not save profile.');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleEmailPreferenceChange(checked: boolean) {
+    setSavingEmailPreference(true);
+    try {
+      await authApi.updateEmailPreferences(checked);
+      await refreshUser();
+      messageApi.success('Email preference saved.');
+    } catch (err) {
+      messageApi.error(
+        err instanceof Error ? err.message : 'Could not save email preference.',
+      );
+    } finally {
+      setSavingEmailPreference(false);
     }
   }
 
@@ -85,6 +102,20 @@ export function ProfilePage() {
 
       <section className="profile-shell">
         {error && <Alert type="error" message={error} showIcon />}
+        <div className="email-preference-row">
+          <div>
+            <BellRinging size={24} weight="duotone" />
+            <div>
+              <strong>Group application email alerts</strong>
+              <span>New applicant reviews and application decisions</span>
+            </div>
+          </div>
+          <Switch
+            checked={user?.notify_group_application_news ?? true}
+            loading={savingEmailPreference}
+            onChange={handleEmailPreferenceChange}
+          />
+        </div>
         {!activeProfile.is_complete && (
           <Alert
             className="profile-reminder"
