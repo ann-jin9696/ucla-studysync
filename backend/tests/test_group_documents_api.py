@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app import groups
@@ -422,3 +423,54 @@ def test_member_can_preview_file_with_correct_content_type(tmp_path, monkeypatch
     assert file_response.content == b"PDF content here"
     assert file_response.headers["content-type"] == "application/pdf"
     assert "inline" in file_response.headers["content-disposition"]
+
+
+@pytest.mark.parametrize(
+    ("file_name", "content_type"),
+    [
+        ("lecture.pdf", "application/pdf"),
+        ("diagram.png", "image/png"),
+        ("photo.jpg", "image/jpeg"),
+        ("notes.txt", "text/plain"),
+        ("outline.md", "text/markdown"),
+    ],
+)
+def test_member_can_upload_supported_preview_file_types(
+    tmp_path,
+    monkeypatch,
+    file_name,
+    content_type,
+):
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client)
+        group_id = create_profile_group(client)
+
+        response = client.post(
+            f"/api/groups/{group_id}/documents",
+            data={"title": "Supported File", "document_type": "notes"},
+            files={"file": (file_name, b"StudySync preview content", content_type)},
+        )
+
+    assert response.status_code == 201
+    assert response.json()["file_name"] == file_name
+
+
+def test_upload_rejects_unsupported_file_type(tmp_path, monkeypatch):
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client)
+        group_id = create_profile_group(client)
+
+        response = client.post(
+            f"/api/groups/{group_id}/documents",
+            data={"title": "Unsupported File", "document_type": "notes"},
+            files={
+                "file": (
+                    "archive.zip",
+                    b"not a previewable classroom file",
+                    "application/zip",
+                )
+            },
+        )
+
+    assert response.status_code == 422
+    assert "PDF, PNG, JPG, TXT, or MD" in response.json()["detail"]

@@ -56,6 +56,34 @@ const documentsByGroup = {
       ai_summary: 'This one-sentence summary covers Alpha setup notes.',
       uploaded_at: '2026-05-23 20:00:00',
     },
+    {
+      id: 11,
+      group_id: 1,
+      uploader_id: 1,
+      uploader_name: 'Ann',
+      title: 'Plain Text Notes',
+      file_name: 'plain-text-notes.txt',
+      file_path: 'uploads/group-1/plain-text-notes.txt',
+      document_type: 'notes',
+      index_status: 'ready' as const,
+      index_error: null,
+      ai_summary: null,
+      uploaded_at: '2026-05-23 20:01:00',
+    },
+    {
+      id: 12,
+      group_id: 1,
+      uploader_id: 1,
+      uploader_name: 'Ann',
+      title: 'Markdown Study Guide',
+      file_name: 'markdown-study-guide.md',
+      file_path: 'uploads/group-1/markdown-study-guide.md',
+      document_type: 'review',
+      index_status: 'ready' as const,
+      index_error: null,
+      ai_summary: null,
+      uploaded_at: '2026-05-23 20:02:00',
+    },
   ],
   2: [
     {
@@ -162,7 +190,6 @@ describe('WorkspaceModule', () => {
       async (_groupId: number, documentId: number) =>
         commentsByDocument[documentId as 10 | 20] ?? [],
     );
-    vi.mocked(groupApi.documentFileUrl).mockReturnValue('/mock-document.pdf');
     vi.mocked(groupApi.getDetail).mockResolvedValue(betaGroupDetail);
     vi.mocked(groupApi.askDocuments).mockResolvedValue({
       answer: 'Alpha notes say to compare setup steps.',
@@ -174,6 +201,24 @@ describe('WorkspaceModule', () => {
         },
       ],
     });
+    vi.mocked(groupApi.documentFileUrl).mockImplementation(
+      (groupId: number, documentId: number) =>
+        `/api/groups/${groupId}/documents/${documentId}/file`,
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        return {
+          ok: true,
+          text: async () =>
+            url.includes('/12/')
+              ? '# Markdown Preview\n\n- First item\n- Second item'
+              : 'Plain text preview body.',
+          blob: async () => new Blob(['preview'], { type: 'application/pdf' }),
+        } as Response;
+      }),
+    );
   });
 
   it('lets a user switch between multiple group workspaces', async () => {
@@ -282,5 +327,41 @@ describe('WorkspaceModule', () => {
     expect(screen.getByText('alpha-notes.pdf')).toBeInTheDocument();
     expect(screen.getByText('Compare your setup and bring one question.')).toBeInTheDocument();
     expect(groupApi.askDocuments).toHaveBeenCalledWith(1, 'What should we compare?');
+  });
+
+  it('previews text and markdown documents in the workspace modal', async () => {
+    const user = userEvent.setup();
+
+    const { unmount } = renderWorkspace();
+
+    const textTitle = await screen.findByText('Plain Text Notes');
+    await user.click(textTitle.closest('button') as HTMLButtonElement);
+
+    expect(await screen.findByText('Plain text preview body.')).toBeInTheDocument();
+
+    unmount();
+    renderWorkspace();
+
+    const markdownTitle = await screen.findByText('Markdown Study Guide');
+    await user.click(markdownTitle.closest('button') as HTMLButtonElement);
+
+    expect(await screen.findByRole('heading', { name: 'Markdown Preview' })).toBeInTheDocument();
+    expect(screen.getByText('First item')).toBeInTheDocument();
+    expect(screen.getByText('Second item')).toBeInTheDocument();
+  });
+
+  it('does not upload files outside the supported preview types', async () => {
+    const user = userEvent.setup();
+    const { container } = renderWorkspace();
+
+    await screen.findByText('Alpha Notes');
+    await user.type(screen.getByLabelText('Title'), 'Unsupported Upload');
+    await user.upload(
+      container.querySelector('input[type="file"]') as HTMLInputElement,
+      new File(['gif'], 'animation.gif', { type: 'image/gif' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Upload document' }));
+
+    expect(groupApi.uploadDocument).not.toHaveBeenCalled();
   });
 });

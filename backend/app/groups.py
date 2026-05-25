@@ -10,6 +10,10 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from fastapi.responses import FileResponse
 
 from .db import get_db
+from .email import (
+    send_group_application_decision_email,
+    send_group_application_reviewer_email,
+)
 from .group_metrics import (
     as_list,
     average_pace,
@@ -46,12 +50,26 @@ document_qa_service = OpenAIDocumentQA()
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 UPLOAD_DIR = BACKEND_DIR / "data" / "uploads"
+SUPPORTED_DOCUMENT_EXTENSIONS = {".pdf", ".png", ".jpg", ".txt", ".md"}
+SUPPORTED_DOCUMENT_EXTENSION_LABEL = "PDF, PNG, JPG, TXT, or MD"
 
 
 def clean_file_name(file_name: str) -> str:
     name = Path(file_name).name.strip()
     name = re.sub(r"[^A-Za-z0-9._-]+", "-", name)
     return name or "uploaded-file"
+
+
+def get_file_extension(file_name: str) -> str:
+    return Path(file_name).suffix.lower()
+
+
+def require_supported_document_file(file_name: str) -> None:
+    if get_file_extension(file_name) not in SUPPORTED_DOCUMENT_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Please upload a {SUPPORTED_DOCUMENT_EXTENSION_LABEL} file.",
+        )
 
 
 def stored_file_path(path: Path) -> str:
@@ -459,6 +477,25 @@ def serialize_pending_application(row: sqlite3.Row) -> PendingApplicationRespons
     )
 
 
+def get_user_for_email(db: sqlite3.Connection, user_id: int) -> sqlite3.Row | None:
+    return db.execute(
+        """
+        SELECT
+            id,
+            full_name,
+            email,
+            notify_group_application_news
+        FROM users
+        WHERE id = ?
+        """,
+        (user_id,),
+    ).fetchone()
+
+
+def user_allows_group_application_email(user: sqlite3.Row | None) -> bool:
+    return bool(user is not None and user["notify_group_application_news"])
+
+
 @router.get("/join-requests/pending", response_model=list[PendingApplicationResponse])
 def list_pending_applications(
     db: sqlite3.Connection = Depends(get_db),
@@ -744,6 +781,14 @@ def apply_to_group(
         """,
         (cursor.lastrowid,),
     ).fetchone()
+    reviewer = get_user_for_email(db, int(group["created_by_user_id"]))
+    if user_allows_group_application_email(reviewer):
+        send_group_application_reviewer_email(
+            reviewer["email"],
+            reviewer["full_name"],
+            user["full_name"],
+            group["name"],
+        )
     return serialize_join_request(row)
 
 
@@ -1001,6 +1046,14 @@ def approve_join_request(
         """,
         (request_id,),
     ).fetchone()
+    applicant = get_user_for_email(db, int(join_request["user_id"]))
+    if user_allows_group_application_email(applicant):
+        send_group_application_decision_email(
+            applicant["email"],
+            applicant["full_name"],
+            group["name"],
+            "approved",
+        )
     return serialize_join_request(row)
 
 
@@ -1043,6 +1096,15 @@ def reject_join_request(
         """,
         (join_request["id"],),
     ).fetchone()
+    group = get_group(db, group_id)
+    applicant = get_user_for_email(db, int(join_request["user_id"]))
+    if user_allows_group_application_email(applicant):
+        send_group_application_decision_email(
+            applicant["email"],
+            applicant["full_name"],
+            group["name"],
+            "rejected",
+        )
     return serialize_join_request(row)
 
 
@@ -1108,6 +1170,7 @@ def upload_document(
 ) -> DocumentResponse:
     require_group_member(db, group_id, int(user["id"]))
     clean_name = clean_file_name(file.filename or "uploaded-file")
+    require_supported_document_file(clean_name)
     group_upload_dir = UPLOAD_DIR / f"group-{group_id}"
     group_upload_dir.mkdir(parents=True, exist_ok=True)
 

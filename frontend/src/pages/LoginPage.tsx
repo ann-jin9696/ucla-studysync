@@ -1,7 +1,7 @@
 import { Alert, Button, Form, Input } from 'antd';
 import { EnvelopeSimple, LockKey } from '@phosphor-icons/react';
 import { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/AuthProvider';
 import { AuthShell } from './AuthShell';
 
@@ -77,6 +77,9 @@ export function LoginPage() {
         <Button type="primary" htmlType="submit" block loading={submitting}>
           Log in
         </Button>
+        <p className="auth-secondary-link">
+          <Link to="/forgot-password">Forgot password?</Link>
+        </p>
       </Form>
     </AuthShell>
   );

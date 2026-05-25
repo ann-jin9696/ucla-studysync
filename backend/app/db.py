@@ -159,7 +159,67 @@ def create_users_table(connection: sqlite3.Connection) -> None:
             full_name TEXT NOT NULL,
             email TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
+            email_verified INTEGER NOT NULL DEFAULT 0,
+            email_verified_at TEXT,
+            notify_group_application_news INTEGER NOT NULL DEFAULT 1,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+
+def ensure_user_email_columns(connection: sqlite3.Connection) -> None:
+    user_columns = table_columns(connection, "users")
+    if "email_verified" not in user_columns:
+        connection.execute(
+            "ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0"
+        )
+        connection.execute("UPDATE users SET email_verified = 1")
+        user_columns.add("email_verified")
+    if "email_verified_at" not in user_columns:
+        connection.execute("ALTER TABLE users ADD COLUMN email_verified_at TEXT")
+        connection.execute(
+            """
+            UPDATE users
+            SET email_verified_at = created_at
+            WHERE email_verified = 1
+              AND email_verified_at IS NULL
+            """
+        )
+        user_columns.add("email_verified_at")
+    if "notify_group_application_news" not in user_columns:
+        connection.execute(
+            """
+            ALTER TABLE users
+            ADD COLUMN notify_group_application_news INTEGER NOT NULL DEFAULT 1
+            """
+        )
+
+
+def create_email_token_tables(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS email_verification_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token_hash TEXT NOT NULL UNIQUE,
+            expires_at TEXT NOT NULL,
+            used_at TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token_hash TEXT NOT NULL UNIQUE,
+            expires_at TEXT NOT NULL,
+            used_at TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
         """
     )
@@ -525,6 +585,14 @@ def create_indexes(connection: sqlite3.Connection) -> None:
     connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_comments_document_id ON comments (document_id)"
     )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_hash "
+        "ON email_verification_tokens (token_hash)"
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_hash "
+        "ON password_reset_tokens (token_hash)"
+    )
 
 
 def seed_mock_courses(connection: sqlite3.Connection) -> None:
@@ -675,7 +743,13 @@ def get_seed_user_ids(connection: sqlite3.Connection) -> dict[str, int]:
             ).fetchone()
             user_ids[email] = int(row["id"])
         connection.execute(
-            "UPDATE users SET full_name = ? WHERE id = ?",
+            """
+            UPDATE users
+            SET full_name = ?,
+                email_verified = 1,
+                email_verified_at = COALESCE(email_verified_at, created_at)
+            WHERE id = ?
+            """,
             (full_name, user_ids[email]),
         )
     return user_ids
@@ -1116,6 +1190,8 @@ def restore_legacy_user_courses(
 def init_db() -> None:
     with get_connection() as connection:
         create_users_table(connection)
+        ensure_user_email_columns(connection)
+        create_email_token_tables(connection)
 
         rebuild_courses = needs_course_schema_rebuild(connection)
         rebuild_documents = needs_document_schema_rebuild(connection)

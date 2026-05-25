@@ -1,4 +1,4 @@
-import { Alert, Button, Form, Input } from 'antd';
+import { Alert, Button, Checkbox, Form, Input } from 'antd';
 import { EnvelopeSimple, LockKey, UserCircle } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -9,6 +9,7 @@ type SignupValues = {
   full_name: string;
   email: string;
   password: string;
+  notify_group_application_news: boolean;
 };
 
 export function SignupPage() {
@@ -22,7 +23,7 @@ export function SignupPage() {
     setSubmitting(true);
     try {
       await signup(values);
-      navigate('/profile/setup', { replace: true });
+      navigate('/verify-email', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to create account.');
     } finally {
@@ -39,7 +40,12 @@ export function SignupPage() {
       switchLabel="Log in"
       switchTo="/login"
     >
-      <Form layout="vertical" onFinish={handleFinish} className="auth-form">
+      <Form
+        layout="vertical"
+        onFinish={handleFinish}
+        className="auth-form"
+        initialValues={{ notify_group_application_news: true }}
+      >
         {error && <Alert type="error" message={error} showIcon />}
         <Form.Item
           label="Full name"
@@ -88,6 +94,11 @@ export function SignupPage() {
             prefix={<LockKey size={18} weight="duotone" />}
             placeholder="At least 8 characters"
           />
+        </Form.Item>
+        <Form.Item name="notify_group_application_news" valuePropName="checked">
+          <Checkbox>
+            Email me when group applications need review or receive a decision.
+          </Checkbox>
         </Form.Item>
         <Button type="primary" htmlType="submit" block loading={submitting}>
           Create account

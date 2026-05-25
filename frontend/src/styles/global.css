@@ -218,6 +218,17 @@ h1 {
   text-align: center;
 }
 
+.auth-secondary-link {
+  margin: 2px 0 0;
+  font-family: 'Comfortaa', 'Avenir Next', 'Segoe UI', sans-serif;
+  text-align: center;
+}
+
+.auth-action-stack {
+  display: grid;
+  gap: 16px;
+}
+
 .classroom-card {
   width: 100%;
   max-width: 560px;
@@ -595,6 +606,37 @@ h1 {
 .profile-field-note {
   color: #667c74;
   font-family: 'Comfortaa', 'Avenir Next', 'Segoe UI', sans-serif;
+}
+
+.email-preference-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border: 1px solid rgba(121, 207, 183, 0.26);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.email-preference-row > div {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.email-preference-row svg {
+  color: #3b9f89;
+}
+
+.email-preference-row strong,
+.email-preference-row span {
+  display: block;
+}
+
+.email-preference-row span {
+  color: #70877d;
+  font-size: 0.92rem;
 }
 
 .profile-shell {
@@ -1519,6 +1561,61 @@ h1 {
 .document-preview-actions {
   display: flex;
   justify-content: flex-end;
+}
+
+.document-preview-text,
+.document-preview-markdown {
+  width: 100%;
+  max-height: min(72vh, 720px);
+  overflow: auto;
+  margin: 0;
+  padding: 20px;
+  border: 1px solid rgba(121, 207, 183, 0.26);
+  border-radius: 14px;
+  background: #ffffff;
+  color: #24483e;
+  text-align: left;
+}
+
+.document-preview-text {
+  white-space: pre-wrap;
+  font-family: "Courier New", monospace;
+  line-height: 1.55;
+}
+
+.document-preview-markdown {
+  display: block;
+  line-height: 1.65;
+}
+
+.document-preview-markdown h1,
+.document-preview-markdown h2,
+.document-preview-markdown h3,
+.document-preview-markdown p,
+.document-preview-markdown ul,
+.document-preview-markdown ol,
+.document-preview-markdown blockquote,
+.document-preview-markdown pre {
+  margin-top: 0;
+}
+
+.document-preview-markdown h1,
+.document-preview-markdown h2,
+.document-preview-markdown h3 {
+  color: #173b33;
+}
+
+.document-preview-markdown blockquote {
+  padding-left: 14px;
+  border-left: 3px solid #79cfb7;
+  color: #4f665f;
+}
+
+.document-preview-markdown pre {
+  overflow: auto;
+  padding: 14px;
+  border-radius: 10px;
+  background: #edf8f1;
 }
 
 .document-preview-fallback {
