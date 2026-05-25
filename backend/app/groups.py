@@ -28,6 +28,7 @@ from .schemas import (
     GroupMemberResponse,
     JoinRequestResponse,
     GroupResponse,
+    PendingApplicationResponse,
 )
 from .security import get_current_user
 
@@ -332,6 +333,46 @@ def serialize_activity(row: sqlite3.Row) -> GroupActivityResponse:
     )
 
 
+def serialize_pending_application(row: sqlite3.Row) -> PendingApplicationResponse:
+    return PendingApplicationResponse(
+        id=row["id"],
+        group_id=row["group_id"],
+        group_name=row["group_name"],
+        course_code=row["course_code"],
+        user_id=row["user_id"],
+        user_name=row["user_name"],
+        created_at=row["created_at"],
+    )
+
+
+@router.get("/join-requests/pending", response_model=list[PendingApplicationResponse])
+def list_pending_applications(
+    db: sqlite3.Connection = Depends(get_db),
+    user: sqlite3.Row = Depends(get_current_user),
+) -> list[PendingApplicationResponse]:
+    rows = db.execute(
+        """
+        SELECT
+            join_requests.id,
+            join_requests.group_id,
+            groups.name AS group_name,
+            courses.course_code,
+            join_requests.user_id,
+            users.full_name AS user_name,
+            join_requests.created_at
+        FROM join_requests
+        JOIN groups ON groups.id = join_requests.group_id
+        JOIN courses ON courses.id = groups.course_id
+        JOIN users ON users.id = join_requests.user_id
+        WHERE groups.created_by_user_id = ?
+          AND join_requests.status = 'pending'
+        ORDER BY join_requests.created_at ASC
+        """,
+        (user["id"],),
+    ).fetchall()
+    return [serialize_pending_application(row) for row in rows]
+
+
 @router.get("", response_model=list[GroupResponse])
 def list_my_groups(
     db: sqlite3.Connection = Depends(get_db),
@@ -545,17 +586,19 @@ def apply_to_group(
 
     active_request = db.execute(
         """
-        SELECT id
+        SELECT join_requests.id
         FROM join_requests
-        WHERE user_id = ?
-          AND status = 'pending'
+        JOIN groups ON groups.id = join_requests.group_id
+        WHERE join_requests.user_id = ?
+          AND join_requests.status = 'pending'
+          AND groups.course_id = ?
         """,
-        (user_id,),
+        (user_id, int(group["course_id"])),
     ).fetchone()
     if active_request is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="You already have a pending group application.",
+            detail="You already have a pending group application for this course.",
         )
 
     try:
@@ -629,6 +672,33 @@ def leave_group(
         """,
         (group_id, user["id"]),
     )
+
+    remaining = db.execute(
+        "SELECT COUNT(*) FROM group_members WHERE group_id = ?",
+        (group_id,),
+    ).fetchone()[0]
+
+    if remaining == 0:
+        db.execute("DELETE FROM groups WHERE id = ?", (group_id,))
+        db.commit()
+        return serialize_group(group)
+
+    if int(group["created_by_user_id"]) == int(user["id"]):
+        next_owner = db.execute(
+            """
+            SELECT user_id
+            FROM group_members
+            WHERE group_id = ?
+            ORDER BY created_at ASC
+            LIMIT 1
+            """,
+            (group_id,),
+        ).fetchone()
+        db.execute(
+            "UPDATE groups SET created_by_user_id = ? WHERE id = ?",
+            (next_owner["user_id"], group_id),
+        )
+
     db.execute(
         "UPDATE groups SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
         (group_id,),

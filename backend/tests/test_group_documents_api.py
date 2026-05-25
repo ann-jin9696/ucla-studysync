@@ -249,3 +249,51 @@ def test_group_activity_is_scoped_to_current_users_groups(tmp_path, monkeypatch)
     assert {activity["document_title"] for activity in activities} == {"Owner Notes"}
     assert {activity["group_id"] for activity in activities} == {owner_group_id}
     assert {activity["actor_name"] for activity in activities} == {"Owner Bruin"}
+
+
+def test_file_preview_requires_authentication(tmp_path, monkeypatch):
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client)
+        group_id = create_profile_group(client)
+        document = upload_document(client, group_id, "Preview Notes")
+        client.post("/api/auth/logout")
+
+        response = client.get(f"/api/groups/{group_id}/documents/{document['id']}/file")
+
+    assert response.status_code == 401
+
+
+def test_non_member_cannot_preview_file(tmp_path, monkeypatch):
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client, "owner@g.ucla.edu")
+        group_id = create_profile_group(client)
+        document = upload_document(client, group_id, "Preview Notes")
+        client.post("/api/auth/logout")
+
+        signup(client, "outsider@g.ucla.edu")
+        response = client.get(f"/api/groups/{group_id}/documents/{document['id']}/file")
+
+    assert response.status_code == 403
+
+
+def test_member_can_preview_file_with_correct_content_type(tmp_path, monkeypatch):
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client)
+        group_id = create_profile_group(client)
+
+        response = client.post(
+            f"/api/groups/{group_id}/documents",
+            data={"title": "Lecture Slides", "document_type": "slides"},
+            files={"file": ("lecture.pdf", b"PDF content here", "application/pdf")},
+        )
+        assert response.status_code == 201
+        document = response.json()
+
+        file_response = client.get(
+            f"/api/groups/{group_id}/documents/{document['id']}/file"
+        )
+
+    assert file_response.status_code == 200
+    assert file_response.content == b"PDF content here"
+    assert file_response.headers["content-type"] == "application/pdf"
+    assert "inline" in file_response.headers["content-disposition"]
