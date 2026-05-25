@@ -1,5 +1,5 @@
 import { type KeyboardEvent, useCallback, useEffect, useState } from "react";
-import { Alert, Button, Card, Spin } from "antd";
+import { Alert, Button, Card, Spin, message } from "antd";
 import {
   CalendarCheck,
   ChatsCircle,
@@ -18,7 +18,7 @@ import {
   WorkspaceModule,
   WorkspaceModuleMode,
 } from "../components/WorkspaceModule";
-import { groupApi, type GroupActivity } from "../api";
+import { groupApi, type GroupActivity, type PendingApplication } from "../api";
 import { parseApiTimestamp } from "../dateTime";
 import { getMissingProfileSections } from "../profileOptions";
 import studySyncLogo from "../assets/studysync-logo.png";
@@ -60,13 +60,17 @@ export function DashboardPage() {
   const { user, logout } = useAuth();
   const { profile } = useProfile();
   const navigate = useNavigate();
-  const [activeModule, setActiveModule] = useState<DashboardModuleMode | null>(
-    null,
-  );
+  const [messageApi, contextHolder] = message.useMessage();
+  const [activeModule, setActiveModule] = useState<DashboardModuleMode | null>(null);
   const [workspaceTarget, setWorkspaceTarget] = useState<WorkspaceTarget | null>(null);
   const [activities, setActivities] = useState<GroupActivity[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(true);
   const [activityError, setActivityError] = useState<string | null>(null);
+  const [activityExpanded, setActivityExpanded] = useState(false);
+  const [pendingApplications, setPendingApplications] = useState<PendingApplication[]>([]);
+  const [loadingApplications, setLoadingApplications] = useState(true);
+  const [applicationsExpanded, setApplicationsExpanded] = useState(false);
+  const [decidingId, setDecidingId] = useState<number | null>(null);
   const missingSections = getMissingProfileSections(profile);
 
   const loadActivities = useCallback(async () => {
@@ -82,6 +86,37 @@ export function DashboardPage() {
       setLoadingActivities(false);
     }
   }, []);
+
+  const loadPendingApplications = useCallback(async () => {
+    setLoadingApplications(true);
+    try {
+      setPendingApplications(await groupApi.listPendingApplications());
+    } catch {
+      // silently fail — not critical
+    } finally {
+      setLoadingApplications(false);
+    }
+  }, []);
+
+  async function handleDecision(app: PendingApplication, decision: "approve" | "reject") {
+    setDecidingId(app.id);
+    try {
+      if (decision === "approve") {
+        await groupApi.approveJoinRequest(app.group_id, app.id);
+        messageApi.success(`${app.user_name} approved.`);
+      } else {
+        await groupApi.rejectJoinRequest(app.group_id, app.id);
+        messageApi.success(`${app.user_name} rejected.`);
+      }
+      await loadPendingApplications();
+    } catch (error) {
+      messageApi.error(
+        error instanceof Error ? error.message : "Could not update application.",
+      );
+    } finally {
+      setDecidingId(null);
+    }
+  }
 
   async function handleLogout() {
     await logout();
@@ -122,10 +157,16 @@ export function DashboardPage() {
 
   useEffect(() => {
     void loadActivities();
-  }, [loadActivities]);
+    void loadPendingApplications();
+  }, [loadActivities, loadPendingApplications]);
+
+  const visibleApplications = applicationsExpanded
+    ? pendingApplications
+    : pendingApplications.slice(0, 3);
 
   return (
     <main className="dashboard-page">
+      {contextHolder}
       <nav className="dashboard-nav">
         <div className="brand-cluster compact">
           <div className="brand-mark">
@@ -171,6 +212,70 @@ export function DashboardPage() {
       )}
 
       <section className="activity-feed">
+        <h2>Pending Applications</h2>
+        <Spin spinning={loadingApplications}>
+          {pendingApplications.length > 0 ? (
+            <div>
+              {visibleApplications.map((app) => (
+                <Card
+                  key={app.id}
+                  className="activity-card"
+                  style={{ marginBottom: "5px" }}
+                  styles={{ body: { padding: "16px" } }}
+                >
+                  <div className="activity-header">
+                    <p className="activity-name">{app.user_name}</p>
+                    <span className="activity-time">{formatRelativeTime(app.created_at)}</span>
+                  </div>
+                  <p className="activity-action-text">
+                    Applied to <span className="activity-target-bold">{app.group_name}</span>
+                  </p>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span className="activity-tag">#{app.course_code}</span>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <Button
+                        size="small"
+                        type="primary"
+                        loading={decidingId === app.id}
+                        onClick={() => handleDecision(app, "approve")}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        size="small"
+                        type="primary"
+                        danger
+                        loading={decidingId === app.id}
+                        onClick={() => handleDecision(app, "reject")}
+                      >
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+              {pendingApplications.length > 3 && (
+                <Button
+                  type="link"
+                  onClick={() => setApplicationsExpanded((prev) => !prev)}
+                >
+                  {applicationsExpanded
+                    ? "Show less"
+                    : `Show all ${pendingApplications.length}`}
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="empty-state-card">
+              <BinocularsIcon size={32} weight="duotone" />
+              <h3>No pending applications</h3>
+              <p>When someone applies to join your group, it will appear here.</p>
+            </div>
+          )}
+        </Spin>
+      </section>
+
+      <section className="activity-feed">
         <h2>Recent Activity</h2>
         {activityError && (
           <Alert
@@ -183,7 +288,7 @@ export function DashboardPage() {
         <Spin spinning={loadingActivities}>
           {activities.length > 0 ? (
             <div>
-              {activities.map((activity) => (
+              {(activityExpanded ? activities : activities.slice(0, 3)).map((activity) => (
                 <ActivityCard
                   key={activity.id}
                   name={activity.actor_name}
@@ -194,6 +299,14 @@ export function DashboardPage() {
                   onView={() => viewActivity(activity)}
                 />
               ))}
+              {activities.length > 3 && (
+                <Button
+                  type="link"
+                  onClick={() => setActivityExpanded((prev) => !prev)}
+                >
+                  {activityExpanded ? "Show less" : `Show all ${activities.length}`}
+                </Button>
+              )}
             </div>
           ) : (
             <div className="empty-state-card">
