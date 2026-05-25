@@ -443,3 +443,86 @@ def test_user_can_apply_to_groups_in_different_courses_simultaneously(tmp_path, 
 
     assert first.status_code == 201
     assert second.status_code == 201
+
+
+# leave group
+
+def test_owner_leaving_empty_group_deletes_it(tmp_path, monkeypatch):
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client, "owner@g.ucla.edu")
+        group_id = create_group(client)
+
+        leave = client.delete(f"/api/groups/{group_id}/membership")
+        fetch = client.get(f"/api/groups/{group_id}")
+        my_groups = client.get("/api/groups")
+
+    assert leave.status_code == 200
+    assert fetch.status_code == 404
+    assert not any(g["id"] == group_id for g in my_groups.json())
+
+
+def test_group_stays_when_owner_leaves_with_other_members(tmp_path, monkeypatch):
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client, "owner@g.ucla.edu")
+        group_id = create_group(client)
+        client.post("/api/auth/logout")
+
+        signup(client, "member@g.ucla.edu")
+        enroll_in_course(client)
+        join_req = client.post(f"/api/groups/{group_id}/join-requests").json()
+        client.post("/api/auth/logout")
+
+        login(client, "owner@g.ucla.edu")
+        client.post(f"/api/groups/{group_id}/join-requests/{join_req['id']}/approve")
+        leave = client.delete(f"/api/groups/{group_id}/membership")
+        client.post("/api/auth/logout")
+
+        login(client, "member@g.ucla.edu")
+        fetch = client.get(f"/api/groups/{group_id}")
+
+    assert leave.status_code == 200
+    assert fetch.status_code == 200
+    assert fetch.json()["member_count"] == 1
+
+
+def test_second_member_becomes_owner_when_owner_leaves(tmp_path, monkeypatch):
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client, "owner@g.ucla.edu", "Owner Bruin")
+        group_id = create_group(client)
+        client.post("/api/auth/logout")
+
+        signup(client, "member@g.ucla.edu", "Member Bruin")
+        enroll_in_course(client)
+        join_req = client.post(f"/api/groups/{group_id}/join-requests").json()
+        client.post("/api/auth/logout")
+
+        login(client, "owner@g.ucla.edu")
+        client.post(f"/api/groups/{group_id}/join-requests/{join_req['id']}/approve")
+        client.delete(f"/api/groups/{group_id}/membership")
+        client.post("/api/auth/logout")
+
+        login(client, "member@g.ucla.edu")
+        detail = client.get(f"/api/groups/{group_id}")
+
+    assert detail.status_code == 200
+    assert detail.json()["owner_name"] == "Member Bruin"
+
+
+def test_pending_applications_cleared_when_empty_group_deleted(tmp_path, monkeypatch):
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client, "owner@g.ucla.edu")
+        group_id = create_group(client)
+        client.post("/api/auth/logout")
+
+        signup(client, "applicant@g.ucla.edu")
+        enroll_in_course(client)
+        client.post(f"/api/groups/{group_id}/join-requests")
+        client.post("/api/auth/logout")
+
+        login(client, "owner@g.ucla.edu")
+        client.delete(f"/api/groups/{group_id}/membership")
+
+        pending = client.get("/api/groups/join-requests/pending")
+
+    assert pending.status_code == 200
+    assert pending.json() == []

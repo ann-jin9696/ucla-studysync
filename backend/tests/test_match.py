@@ -330,7 +330,7 @@ def test_user_can_belong_to_multiple_groups_after_approved_requests(
     }
 
 
-def test_member_can_leave_group_without_deleting_group(tmp_path, monkeypatch):
+def test_owner_leaving_solo_group_removes_it_from_directory(tmp_path, monkeypatch):
     with make_client(tmp_path, monkeypatch) as client:
         owner_profile = signup_with_profile(
             client,
@@ -350,9 +350,7 @@ def test_member_can_leave_group_without_deleting_group(tmp_path, monkeypatch):
 
     assert directory_before.json()[0]["is_member"] is True
     assert leave.status_code == 200
-    assert leave.json()["member_count"] == 0
-    assert directory_after.json()[0]["is_member"] is False
-    assert directory_after.json()[0]["is_owner"] is True
+    assert directory_after.json() == []
     assert my_groups.json() == []
 
 

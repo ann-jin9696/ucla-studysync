@@ -117,6 +117,16 @@ class JoinRequestResponse(BaseModel):
     decided_at: str | None
 
 
+class PendingApplicationResponse(BaseModel):
+    id: int
+    group_id: int
+    group_name: str
+    course_code: str
+    user_id: int
+    user_name: str
+    created_at: str
+
+
 class DocumentResponse(BaseModel):
     id: int
     group_id: int

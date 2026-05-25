@@ -110,6 +110,16 @@ export type JoinRequest = {
   decided_at: string | null;
 };
 
+export type PendingApplication = {
+  id: number;
+  group_id: number;
+  group_name: string;
+  course_code: string;
+  user_id: number;
+  user_name: string;
+  created_at: string;
+};
+
 export type GroupDocument = {
   id: number;
   group_id: number;
@@ -244,6 +254,9 @@ export const groupApi = {
   listActivity(limit = 8) {
     const params = new URLSearchParams({ limit: String(limit) });
     return request<GroupActivity[]>(`/api/groups/activity?${params.toString()}`);
+  },
+  listPendingApplications() {
+    return request<PendingApplication[]>('/api/groups/join-requests/pending');
   },
   create(input: { user_course_id: number; name?: string }) {
     return request<Group>('/api/groups', {
