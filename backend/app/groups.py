@@ -17,9 +17,17 @@ from .group_metrics import (
     group_size_bucket,
     top_study_goals,
 )
+from .openai_document_qa import (
+    DocumentQAError,
+    DocumentQAUnavailable,
+    OpenAIDocumentQA,
+)
 from .schemas import (
     CommentCreateRequest,
     CommentResponse,
+    DocumentQARequest,
+    DocumentQAResponse,
+    DocumentQASource,
     DocumentResponse,
     GroupActivityResponse,
     GroupCreateRequest,
@@ -34,6 +42,7 @@ from .security import get_current_user
 
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
+document_qa_service = OpenAIDocumentQA()
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 UPLOAD_DIR = BACKEND_DIR / "data" / "uploads"
@@ -118,6 +127,7 @@ def get_group(db: sqlite3.Connection, group_id: int) -> sqlite3.Row:
             courses.course_quarter,
             courses.lecture_number,
             groups.created_by_user_id,
+            groups.openai_vector_store_id,
             groups.created_at,
             groups.updated_at,
             COUNT(group_members.id) AS member_count
@@ -148,6 +158,7 @@ def get_group_with_owner(db: sqlite3.Connection, group_id: int) -> sqlite3.Row:
             courses.course_quarter,
             courses.lecture_number,
             groups.created_by_user_id,
+            groups.openai_vector_store_id,
             owner.full_name AS owner_name,
             groups.created_at,
             groups.updated_at,
@@ -192,6 +203,101 @@ def require_group_member(
     return group
 
 
+def ensure_group_vector_store(db: sqlite3.Connection, group: sqlite3.Row) -> str:
+    vector_store_id = group["openai_vector_store_id"]
+    if vector_store_id:
+        return str(vector_store_id)
+
+    vector_store_id = document_qa_service.create_vector_store(
+        int(group["id"]),
+        str(group["name"]),
+    )
+    db.execute(
+        "UPDATE groups SET openai_vector_store_id = ? WHERE id = ?",
+        (vector_store_id, group["id"]),
+    )
+    db.commit()
+    return vector_store_id
+
+
+def mark_document_index_failed(
+    db: sqlite3.Connection,
+    document_id: int,
+    error: str,
+) -> None:
+    db.execute(
+        """
+        UPDATE documents
+        SET index_status = 'failed',
+            index_error = ?
+        WHERE id = ?
+        """,
+        (error[:500], document_id),
+    )
+    db.commit()
+
+
+def index_saved_document(
+    db: sqlite3.Connection,
+    group_id: int,
+    document_id: int,
+    file_name: str,
+    saved_path: Path,
+) -> None:
+    try:
+        group = get_group(db, group_id)
+        vector_store_id = ensure_group_vector_store(db, group)
+        indexed_document = document_qa_service.index_document(
+            vector_store_id=vector_store_id,
+            file_path=saved_path,
+            group_id=group_id,
+            document_id=document_id,
+            file_name=file_name,
+        )
+    except DocumentQAUnavailable as exc:
+        mark_document_index_failed(db, document_id, str(exc))
+        return
+    except DocumentQAError as exc:
+        mark_document_index_failed(db, document_id, str(exc))
+        return
+    except Exception as exc:
+        mark_document_index_failed(db, document_id, f"OpenAI indexing failed: {exc}")
+        return
+
+    ai_summary: str | None = None
+    if indexed_document.status == "ready":
+        try:
+            ai_summary = document_qa_service.summarize_document(
+                vector_store_id=vector_store_id,
+                document_id=document_id,
+                file_name=file_name,
+            )
+        except (DocumentQAUnavailable, DocumentQAError):
+            ai_summary = None
+        except Exception:
+            ai_summary = None
+
+    db.execute(
+        """
+        UPDATE documents
+        SET openai_file_id = ?,
+            openai_vector_store_file_id = ?,
+            index_status = ?,
+            index_error = NULL,
+            ai_summary = ?
+        WHERE id = ?
+        """,
+        (
+            indexed_document.openai_file_id,
+            indexed_document.openai_vector_store_file_id,
+            indexed_document.status,
+            ai_summary,
+            document_id,
+        ),
+    )
+    db.commit()
+
+
 def ensure_document_in_group(
     db: sqlite3.Connection,
     group_id: int,
@@ -207,6 +313,11 @@ def ensure_document_in_group(
             documents.file_name,
             documents.file_path,
             documents.document_type,
+            documents.openai_file_id,
+            documents.openai_vector_store_file_id,
+            documents.index_status,
+            documents.index_error,
+            documents.ai_summary,
             documents.uploaded_at
         FROM documents
         WHERE documents.id = ?
@@ -303,6 +414,9 @@ def serialize_document(row: sqlite3.Row) -> DocumentResponse:
         file_name=row["file_name"],
         file_path=row["file_path"],
         document_type=row["document_type"],
+        index_status=row["index_status"],
+        index_error=row["index_error"],
+        ai_summary=row["ai_summary"],
         uploaded_at=row["uploaded_at"],
     )
 
@@ -953,6 +1067,11 @@ def list_documents(
             documents.file_name,
             documents.file_path,
             documents.document_type,
+            documents.openai_file_id,
+            documents.openai_vector_store_file_id,
+            documents.index_status,
+            documents.index_error,
+            documents.ai_summary,
             documents.uploaded_at
         FROM documents
         JOIN users ON users.id = documents.uploader_id
@@ -1000,9 +1119,10 @@ def upload_document(
             title,
             file_name,
             file_path,
-            document_type
+            document_type,
+            index_status
         )
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, 'indexing')
         """,
         (
             group_id,
@@ -1029,6 +1149,7 @@ def upload_document(
         (group_id,),
     )
     db.commit()
+    index_saved_document(db, group_id, document_id, clean_name, saved_path)
 
     row = db.execute(
         """
@@ -1041,6 +1162,11 @@ def upload_document(
             documents.file_name,
             documents.file_path,
             documents.document_type,
+            documents.openai_file_id,
+            documents.openai_vector_store_file_id,
+            documents.index_status,
+            documents.index_error,
+            documents.ai_summary,
             documents.uploaded_at
         FROM documents
         JOIN users ON users.id = documents.uploader_id
@@ -1050,6 +1176,73 @@ def upload_document(
     ).fetchone()
 
     return serialize_document(row)
+
+
+@router.post("/{group_id}/qa", response_model=DocumentQAResponse)
+def ask_group_documents(
+    group_id: int,
+    payload: DocumentQARequest,
+    db: sqlite3.Connection = Depends(get_db),
+    user: sqlite3.Row = Depends(get_current_user),
+) -> DocumentQAResponse:
+    group = require_group_member(db, group_id, int(user["id"]))
+    question = " ".join(payload.question.strip().split())
+    if not question:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Question is required.",
+        )
+
+    ready_documents = db.execute(
+        """
+        SELECT id
+        FROM documents
+        WHERE group_id = ?
+          AND index_status = 'ready'
+        """,
+        (group_id,),
+    ).fetchall()
+    if not ready_documents or not group["openai_vector_store_id"]:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No indexed documents are ready for Q&A yet.",
+        )
+
+    try:
+        answer = document_qa_service.answer_question(
+            vector_store_id=str(group["openai_vector_store_id"]),
+            question=question,
+        )
+    except DocumentQAUnavailable as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    except DocumentQAError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"OpenAI document Q&A failed: {exc}",
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"OpenAI document Q&A failed: {exc}",
+        ) from exc
+
+    response_text = answer.answer or (
+        "The shared documents do not include enough information to answer that."
+    )
+    return DocumentQAResponse(
+        answer=response_text,
+        sources=[
+            DocumentQASource(
+                document_id=source.document_id,
+                file_name=source.file_name,
+                snippet=source.snippet[:800],
+            )
+            for source in answer.sources
+        ],
+    )
 
 
 @router.get("/{group_id}/documents/{document_id}/file")

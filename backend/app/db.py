@@ -344,6 +344,8 @@ def ensure_group_columns(connection: sqlite3.Connection) -> None:
     group_columns = table_columns(connection, "groups")
     if group_columns and "name" not in group_columns:
         connection.execute("ALTER TABLE groups ADD COLUMN name TEXT")
+    if group_columns and "openai_vector_store_id" not in group_columns:
+        connection.execute("ALTER TABLE groups ADD COLUMN openai_vector_store_id TEXT")
     connection.execute(
         """
         UPDATE groups
@@ -351,6 +353,26 @@ def ensure_group_columns(connection: sqlite3.Connection) -> None:
         WHERE name IS NULL OR TRIM(name) = ''
         """
     )
+
+
+def ensure_document_columns(connection: sqlite3.Connection) -> None:
+    document_columns = table_columns(connection, "documents")
+    if not document_columns:
+        return
+    if "openai_file_id" not in document_columns:
+        connection.execute("ALTER TABLE documents ADD COLUMN openai_file_id TEXT")
+    if "openai_vector_store_file_id" not in document_columns:
+        connection.execute(
+            "ALTER TABLE documents ADD COLUMN openai_vector_store_file_id TEXT"
+        )
+    if "index_status" not in document_columns:
+        connection.execute(
+            "ALTER TABLE documents ADD COLUMN index_status TEXT NOT NULL DEFAULT 'failed'"
+        )
+    if "index_error" not in document_columns:
+        connection.execute("ALTER TABLE documents ADD COLUMN index_error TEXT")
+    if "ai_summary" not in document_columns:
+        connection.execute("ALTER TABLE documents ADD COLUMN ai_summary TEXT")
 
 
 def create_course_group_tables(connection: sqlite3.Connection) -> None:
@@ -392,6 +414,7 @@ def create_course_group_tables(connection: sqlite3.Connection) -> None:
             name TEXT NOT NULL,
             course_id INTEGER NOT NULL,
             created_by_user_id INTEGER NOT NULL,
+            openai_vector_store_id TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
@@ -441,12 +464,18 @@ def create_course_group_tables(connection: sqlite3.Connection) -> None:
             file_name TEXT NOT NULL,
             file_path TEXT NOT NULL,
             document_type TEXT NOT NULL,
+            openai_file_id TEXT,
+            openai_vector_store_file_id TEXT,
+            index_status TEXT NOT NULL DEFAULT 'failed',
+            index_error TEXT,
+            ai_summary TEXT,
             uploaded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
             FOREIGN KEY (uploader_id) REFERENCES users(id) ON DELETE CASCADE
         )
         """
     )
+    ensure_document_columns(connection)
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS comments (

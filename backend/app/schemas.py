@@ -136,6 +136,9 @@ class DocumentResponse(BaseModel):
     file_name: str
     file_path: str
     document_type: str
+    index_status: str
+    index_error: str | None
+    ai_summary: str | None
     uploaded_at: str
 
 
@@ -155,6 +158,21 @@ class CommentResponse(BaseModel):
     author_name: str
     content: str
     created_at: str
+
+
+class DocumentQARequest(BaseModel):
+    question: str = Field(min_length=1, max_length=1000)
+
+
+class DocumentQASource(BaseModel):
+    document_id: int | None
+    file_name: str
+    snippet: str
+
+
+class DocumentQAResponse(BaseModel):
+    answer: str
+    sources: list[DocumentQASource]
 
 
 class GroupActivityResponse(BaseModel):
