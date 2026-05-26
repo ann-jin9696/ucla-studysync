@@ -408,17 +408,17 @@ h1 {
 .welcome-band {
   max-width: var(--dashboard-content-width);
   margin: 0 auto 24px;
-  padding: 52px;
-  border-radius: 36px;
+  padding: 28px 40px;
+  border-radius: 24px;
+}
+
+.welcome-band h1 {
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  margin-bottom: 0;
 }
 
 .welcome-band p:last-child {
-  max-width: 42rem;
-  margin-bottom: 0;
-  color: #647b73;
-  font-family: 'Comfortaa', 'Avenir Next', 'Segoe UI', sans-serif;
-  font-size: 1.12rem;
-  line-height: 1.7;
+  display: none;
 }
 
 .matches-section {
