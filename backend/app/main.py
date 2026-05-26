@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .ai import router as ai_router
 from .auth import router as auth_router
 from .groups import router as groups_router
 from .matching import router as matching_router
@@ -29,6 +30,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(ai_router)
 app.include_router(groups_router)
 app.include_router(matching_router)
 app.include_router(profile_router)
