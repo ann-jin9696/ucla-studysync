@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { ConfigProvider } from 'antd';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { groupApi, type Profile, type ProfileInput } from '../api';
+import { groupApi, type PendingApplication, type Profile, type ProfileInput } from '../api';
 import { DashboardPage } from './DashboardPage';
 
 const baseCourse = {
@@ -48,6 +48,7 @@ vi.mock('../api', async () => {
     groupApi: {
       listMyGroups: vi.fn(async () => []),
       listActivity: vi.fn(async () => []),
+      listPendingApplications: vi.fn(async () => []),
       create: vi.fn(),
       apply: vi.fn(),
       leave: vi.fn(),
@@ -96,9 +97,20 @@ function renderDashboard() {
 }
 
 describe('DashboardPage', () => {
+  const pendingApp: PendingApplication = {
+    id: 1,
+    group_id: 10,
+    group_name: 'CS35L Study Hub',
+    course_code: 'CS35L',
+    user_id: 2,
+    user_name: 'Applicant Bruin',
+    created_at: new Date().toISOString(),
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(groupApi.listActivity).mockResolvedValue([]);
+    vi.mocked(groupApi.listPendingApplications).mockResolvedValue([]);
   });
 
   it('shows a reminder for basic incomplete profiles', async () => {
@@ -246,6 +258,44 @@ describe('DashboardPage', () => {
     expect(document.querySelector('.workspace-shell')?.textContent).toContain(
       'Shared workspaces',
     );
+  });
+
+  it('refreshes pending applications after a successful approve', async () => {
+    vi.mocked(groupApi.listPendingApplications).mockResolvedValueOnce([pendingApp]);
+    vi.mocked(groupApi.approveJoinRequest).mockResolvedValue(undefined as never);
+
+    renderDashboard();
+    await userEvent.click(await screen.findByRole('button', { name: 'Approve' }));
+
+    expect(groupApi.listPendingApplications).toHaveBeenCalledTimes(2);
+  });
+
+  it('refreshes pending applications after a failed approve', async () => {
+    vi.mocked(groupApi.listPendingApplications).mockResolvedValueOnce([pendingApp]);
+    vi.mocked(groupApi.approveJoinRequest).mockRejectedValue(
+      new Error('You are not the owner of this group.'),
+    );
+
+    renderDashboard();
+    await userEvent.click(await screen.findByRole('button', { name: 'Approve' }));
+
+    await screen.findByText('You are not the owner of this group.');
+    expect(groupApi.listPendingApplications).toHaveBeenCalledTimes(2);
+  });
+
+  it('removes stale application card when group no longer exists', async () => {
+    vi.mocked(groupApi.listPendingApplications)
+      .mockResolvedValueOnce([pendingApp])
+      .mockResolvedValueOnce([]);
+    vi.mocked(groupApi.approveJoinRequest).mockRejectedValue(
+      new Error('Group not found.'),
+    );
+
+    renderDashboard();
+    await userEvent.click(await screen.findByRole('button', { name: 'Approve' }));
+
+    await screen.findByText('Group not found.');
+    expect(screen.queryByText('Applicant Bruin')).not.toBeInTheDocument();
   });
 
   it('lets group matching use the selected module card style', async () => {
