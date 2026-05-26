@@ -211,6 +211,7 @@ export function DashboardPage() {
         />
       )}
 
+      <div className="dashboard-feed-row">
       <section className="activity-feed">
         <h2>Pending Applications</h2>
         <Spin spinning={loadingApplications}>
@@ -324,6 +325,7 @@ export function DashboardPage() {
           )}
         </Spin>
       </section>
+      </div>
 
       <section
         className="dashboard-grid module-menu"

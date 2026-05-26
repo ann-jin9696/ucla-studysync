@@ -1102,14 +1102,11 @@ export function WorkspaceModule({
                         <p>{qaAnswer.answer}</p>
                         {qaAnswer.sources.length > 0 && (
                           <div className="document-qa-sources">
-                            {qaAnswer.sources.map((source, index) => (
-                              <article
-                                className="document-qa-source"
-                                key={`${source.document_id ?? source.file_name}-${index}`}
-                              >
-                                <strong>{source.file_name}</strong>
-                                <span>{source.snippet}</span>
-                              </article>
+                            <span className="document-qa-sources-label">Sources</span>
+                            {[...new Set(qaAnswer.sources.map((s) => s.file_name))].map((fileName) => (
+                              <span className="document-qa-source" key={fileName}>
+                                {fileName}
+                              </span>
                             ))}
                           </div>
                         )}
