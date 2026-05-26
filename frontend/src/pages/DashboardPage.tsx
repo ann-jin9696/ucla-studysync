@@ -108,12 +108,12 @@ export function DashboardPage() {
         await groupApi.rejectJoinRequest(app.group_id, app.id);
         messageApi.success(`${app.user_name} rejected.`);
       }
-      await loadPendingApplications();
     } catch (error) {
       messageApi.error(
         error instanceof Error ? error.message : "Could not update application.",
       );
     } finally {
+      await loadPendingApplications();
       setDecidingId(null);
     }
   }
