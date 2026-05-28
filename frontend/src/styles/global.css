@@ -1343,8 +1343,7 @@ h1 {
 
 .document-qa-card .ant-card-body,
 .document-qa-composer,
-.document-qa-answer,
-.document-qa-sources {
+.document-qa-answer {
   display: grid;
   gap: 14px;
 }
@@ -1367,22 +1366,28 @@ h1 {
   line-height: 1.7;
 }
 
-.document-qa-source {
-  display: grid;
-  gap: 6px;
-  padding: 12px;
-  border-left: 3px solid rgba(75, 146, 127, 0.55);
-  border-radius: 12px;
-  background: rgba(244, 255, 247, 0.74);
+.document-qa-sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
-.document-qa-source strong {
-  color: #24483e;
-}
-
-.document-qa-source span {
+.document-qa-sources-label {
+  font-size: 12px;
+  font-weight: 600;
   color: #5f766f;
-  line-height: 1.55;
+}
+
+.document-qa-source {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(75, 146, 127, 0.4);
+  background: rgba(244, 255, 247, 0.9);
+  font-size: 12px;
+  color: #24483e;
 }
 
 .matching-layout {
