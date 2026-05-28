@@ -403,8 +403,20 @@ export const groupApi = {
       body: JSON.stringify({ question }),
     });
   },
-};
 
+  updateComment(commentId: number, content: string) {
+    return request<{ message: string }>('/api/comments/${commentId}', {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
+    });
+  },
+  
+  deleteComment(commentId: number) {
+    return request<void>('/api/comments/$(commentId', {
+      method: 'DELETE',
+    });
+  }
+};
 export const matchingApi = {
   listGroups(
     userCourseId: number,
