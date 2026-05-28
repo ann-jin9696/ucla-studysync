@@ -1380,7 +1380,6 @@ h1 {
   line-height: 1.7;
 }
 
-<<<<<<< HEAD
 .document-qa-sources {
   display: flex;
   flex-wrap: wrap;
@@ -1388,8 +1387,6 @@ h1 {
   gap: 8px;
 }
 
-=======
->>>>>>> main
 .document-qa-sources-label {
   font-size: 12px;
   font-weight: 600;
