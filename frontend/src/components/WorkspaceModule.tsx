@@ -626,6 +626,20 @@ export function WorkspaceModule({
     }
   }
 
+  async function handleDeleteComment(commentId: number) {
+    try {
+      await groupApi.deleteComment(commentId);
+      messageApi.success("Comment Deleted!");
+
+      setComments((curr) => curr.filter((c) => c.id !== commentId));
+      onActivityChange?.();
+    } catch (error) {
+      messageApi.error(
+        error instanceof Error ? error.message : "Couldn't delete comment",
+      );
+    }
+  }
+
   async function handleAskDocuments() {
     if (!selectedGroupId || !qaQuestion.trim()) {
       return;
