@@ -108,12 +108,12 @@ export function DashboardPage() {
         await groupApi.rejectJoinRequest(app.group_id, app.id);
         messageApi.success(`${app.user_name} rejected.`);
       }
-      await loadPendingApplications();
     } catch (error) {
       messageApi.error(
         error instanceof Error ? error.message : "Could not update application.",
       );
     } finally {
+      await loadPendingApplications();
       setDecidingId(null);
     }
   }
@@ -211,6 +211,7 @@ export function DashboardPage() {
         />
       )}
 
+      <div className="dashboard-feed-row">
       <section className="activity-feed">
         <h2>Pending Applications</h2>
         <Spin spinning={loadingApplications}>
@@ -324,6 +325,7 @@ export function DashboardPage() {
           )}
         </Spin>
       </section>
+      </div>
 
       <section
         className="dashboard-grid module-menu"
