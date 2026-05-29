@@ -28,6 +28,7 @@ import type { Group, GroupDetail, GroupDocument } from "../api";
 import { groupApi } from "../api";
 import { parseApiTimestamp } from "../dateTime";
 import { PACE_OPTIONS, STUDY_GOAL_OPTIONS } from "../profileOptions";
+import { useAuth } from "../components/AuthProvider";
 
 export type WorkspaceModuleMode = "workspace" | "discussion";
 
@@ -298,6 +299,7 @@ export function WorkspaceModule({
   focusRequestId = 0,
   onActivityChange,
 }: WorkspaceModuleProps) {
+  const { user } = useAuth();
   const shellRef = useRef<HTMLElement | null>(null);
   const [messageApi, contextHolder] = message.useMessage();
   const [uploadForm] = Form.useForm<UploadFormValues>();
@@ -1353,26 +1355,96 @@ export function WorkspaceModule({
                               <Empty description="No comments yet" />
                             ) : (
                               <div className="comment-list">
-                                {comments.map((comment) => (
-                                  <article
-                                    className={classNames(
-                                      "comment-item",
-                                      comment.id === focusedCommentId &&
-                                        "focused-activity",
-                                    )}
-                                    data-comment-id={comment.id}
-                                    key={comment.id}
-                                    tabIndex={-1}
-                                  >
-                                    <div>
-                                      <strong>{comment.author_name}</strong>
-                                      <span>
-                                        {formatDate(comment.created_at)}
-                                      </span>
-                                    </div>
-                                    <p>{comment.content}</p>
-                                  </article>
-                                ))}
+                                {comments.map((comment) => {
+                                  return (
+                                    <article
+                                      className={classNames(
+                                        "comment-item",
+                                        comment.id === focusedCommentId &&
+                                          "focused-activity",
+                                      )}
+                                      data-comment-id={comment.id}
+                                      key={comment.id}
+                                      tabIndex={-1}
+                                    >
+                                      <div className="comment-header">
+                                        <div className="comment-author-info">
+                                          <strong>{comment.author_name}</strong>
+                                          <span className="comment-date">
+                                            {formatDate(comment.created_at)}
+                                          </span>
+                                        </div>
+
+                                        {user?.id === comment.author_id && (
+                                          <div className="comment-buttons">
+                                            <Button
+                                              type="text"
+                                              size="small"
+                                              onClick={() => {
+                                                setEditCommentId(comment.id);
+                                                setEditCommentText(
+                                                  comment.content,
+                                                );
+                                              }}
+                                            >
+                                              <NotePencil size={16} /> Edit
+                                            </Button>
+                                            <Button
+                                              type="text"
+                                              danger
+                                              size="small"
+                                              onClick={() =>
+                                                handleDeleteComment(comment.id)
+                                              }
+                                            >
+                                              <Trash size={16} /> Delete
+                                            </Button>
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {editCommentId === comment.id ? (
+                                        <div style={{ marginTop: "8px" }}>
+                                          <Input.TextArea
+                                            autoSize={{
+                                              minRows: 2,
+                                              maxRows: 5,
+                                            }}
+                                            value={editCommentText}
+                                            onChange={(e) =>
+                                              setEditCommentText(e.target.value)
+                                            }
+                                          />
+                                          <div className="comment-editing-buttons">
+                                            <Button
+                                              type="primary"
+                                              size="small"
+                                              loading={editingComment}
+                                              onClick={() =>
+                                                handleUpdateComment(comment.id)
+                                              }
+                                            >
+                                              Save
+                                            </Button>
+                                            <Button
+                                              size="small"
+                                              onClick={() => {
+                                                setEditCommentId(null);
+                                                setEditCommentText("");
+                                              }}
+                                            >
+                                              Cancel
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <p style={{ marginTop: "8px" }}>
+                                          {comment.content}
+                                        </p>
+                                      )}
+                                    </article>
+                                  );
+                                })}
                               </div>
                             )}
                           </Spin>
