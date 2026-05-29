@@ -405,14 +405,14 @@ export const groupApi = {
   },
 
   updateComment(commentId: number, content: string) {
-    return request<{ message: string }>('/api/comments/${commentId}', {
+    return request<{ message: string }>(`/api/groups/comments/${commentId}`, {
       method: 'PUT',
       body: JSON.stringify({ content }),
     });
   },
   
   deleteComment(commentId: number) {
-    return request<void>('/api/comments/$(commentId', {
+    return request<void>(`/api/groups/comments/${commentId}`, {
       method: 'DELETE',
     });
   }
