@@ -1408,14 +1408,14 @@ h1 {
   line-height: 1.7;
 }
 
-<<<<<<< HEAD .document-qa-sources {
+.document-qa-sources {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
 
-=======>>>>>>>main .document-qa-sources-label {
+main .document-qa-sources-label {
   font-size: 12px;
   font-weight: 600;
   color: #5f766f;
