@@ -190,10 +190,6 @@ export function DashboardPage() {
       <section className="welcome-band">
         <p className="eyebrow">Sunny classroom mode</p>
         <h1>Hi, {user?.full_name ?? "Bruin"}.</h1>
-        <p>
-          Your account is ready. Profile setup, study group matching, and shared
-          notes can plug into this dashboard next.
-        </p>
       </section>
 
       {profile && !profile.is_complete && (
@@ -221,7 +217,6 @@ export function DashboardPage() {
                 <Card
                   key={app.id}
                   className="activity-card"
-                  style={{ marginBottom: "5px" }}
                   styles={{ body: { padding: "16px" } }}
                 >
                   <div className="activity-header">
@@ -231,9 +226,9 @@ export function DashboardPage() {
                   <p className="activity-action-text">
                     Applied to <span className="activity-target-bold">{app.group_name}</span>
                   </p>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div className="activity-footer">
                     <span className="activity-tag">#{app.course_code}</span>
-                    <div style={{ display: "flex", gap: "8px" }}>
+                    <div className="activity-actions">
                       <Button
                         size="small"
                         type="primary"
@@ -317,7 +312,6 @@ export function DashboardPage() {
               <Button
                 onClick={() => selectModule("matching")}
                 type="default"
-                style={{ marginTop: "12px", borderRadius: "10px" }}
               >
                 Find Groups
               </Button>
