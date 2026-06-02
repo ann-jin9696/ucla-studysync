@@ -993,7 +993,7 @@ export function WorkspaceModule({
                         />
                         <span>{uploadFile ? uploadFile.name : 'Choose a file'}</span>
                       </label>
-                      <p style={{ fontSize: '12px', color: '#888', margin: '4px 0 0' }}>
+                      <p className="upload-file-hint-text">
                         Upload and preview {SUPPORTED_UPLOAD_LABEL} files, up to{' '}
                         {MAX_UPLOAD_FILE_MB} MB each.
                       </p>
