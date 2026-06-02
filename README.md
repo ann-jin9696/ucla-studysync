@@ -1,6 +1,6 @@
 # StudySync
 
-StudySync is a study group collaboration app for CS 35L. The current app includes authentication and a shared workspace module for uploading, searching, previewing, and commenting on study materials.
+StudySync is a study group collaboration app for CS 35L. The current app includes authentication and shared group workspaces for uploading, searching, previewing, commenting on, and asking AI-assisted questions about study materials.
 
 ## Local Setup
 
@@ -65,8 +65,9 @@ The Part 4 workspace module lets logged-in users:
 
 - upload documents,
 - search shared documents,
-- preview uploaded images and PDFs,
+- preview uploaded images, PDFs, text files, and Markdown files,
 - select a document for discussion,
-- add and view comments attached to a document.
+- add and view comments attached to a document,
+- ask AI-assisted questions about indexed group documents.
 
 More details are in [docs/part4-workspace.md](docs/part4-workspace.md).

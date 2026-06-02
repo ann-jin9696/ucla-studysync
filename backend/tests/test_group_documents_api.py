@@ -142,6 +142,11 @@ class FailingIndexDocumentQA(ReadyDocumentQA):
         raise DocumentQAError("indexing exploded")
 
 
+class EmptyAnswerDocumentQA(ReadyDocumentQA):
+    def answer_question(self, **_kwargs) -> DocumentQAAnswer:
+        return DocumentQAAnswer(answer="", sources=[])
+
+
 def test_group_documents_require_login(tmp_path, monkeypatch):
     with make_client(tmp_path, monkeypatch) as client:
         response = client.get("/api/groups/1/documents")
@@ -384,6 +389,22 @@ def test_group_document_qa_requires_indexed_documents(tmp_path, monkeypatch):
     assert response.json()["detail"] == "No indexed documents are ready for Q&A yet."
 
 
+def test_group_document_qa_rejects_blank_question(tmp_path, monkeypatch):
+    monkeypatch.setattr(groups, "document_qa_service", ReadyDocumentQA())
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client)
+        group_id = create_profile_group(client)
+        upload_document(client, group_id, "Week 1 Notes")
+
+        response = client.post(
+            f"/api/groups/{group_id}/qa",
+            json={"question": "   \n\t   "},
+        )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Please ask a qeustion."
+
+
 def test_group_document_qa_returns_answer_and_sources(tmp_path, monkeypatch):
     monkeypatch.setattr(groups, "document_qa_service", ReadyDocumentQA())
     with make_client(tmp_path, monkeypatch) as client:
@@ -406,6 +427,25 @@ def test_group_document_qa_returns_answer_and_sources(tmp_path, monkeypatch):
             "snippet": "Compare setup steps before discussion.",
         }
     ]
+
+
+def test_group_document_qa_uses_fallback_when_answer_is_empty(tmp_path, monkeypatch):
+    monkeypatch.setattr(groups, "document_qa_service", EmptyAnswerDocumentQA())
+    with make_client(tmp_path, monkeypatch) as client:
+        signup(client)
+        group_id = create_profile_group(client)
+        upload_document(client, group_id, "Week 1 Notes")
+
+        response = client.post(
+            f"/api/groups/{group_id}/qa",
+            json={"question": "What is missing from the notes?"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "answer": "The shared documents do not contain information to answer that.",
+        "sources": [],
+    }
 
 
 def test_group_activity_is_scoped_to_current_users_groups(tmp_path, monkeypatch):
