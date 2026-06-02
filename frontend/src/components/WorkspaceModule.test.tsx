@@ -333,8 +333,8 @@ describe('WorkspaceModule', () => {
     await user.click(screen.getByRole('button', { name: 'Ask' }));
 
     expect(await screen.findByText('Alpha notes say to compare setup steps.')).toBeInTheDocument();
+    expect(screen.getByText('Sources')).toBeInTheDocument();
     expect(screen.getByText('alpha-notes.pdf')).toBeInTheDocument();
-    expect(screen.getByText('Compare your setup and bring one question.')).toBeInTheDocument();
     expect(groupApi.askDocuments).toHaveBeenCalledWith(1, 'What should we compare?');
   });
 
