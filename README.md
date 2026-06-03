@@ -112,6 +112,11 @@ npm run build
 
 ### Local Runtime Topology
 
+This diagram shows the local development processes and the boundaries between
+them: the browser loads the React app from Vite, Vite proxies API calls to the
+FastAPI server, and the backend owns local persistence, uploaded files, and
+optional external services.
+
 ```mermaid
 flowchart LR
     Browser["Browser\nhttp://127.0.0.1:5173"] --> Vite["Vite dev server\nfrontend/ React + Ant Design"]
@@ -125,6 +130,11 @@ flowchart LR
 ```
 
 ### Frontend And API Module Map
+
+This diagram maps the main React modules to the FastAPI routers they call. It is
+useful when tracing a user workflow from a page or dashboard module, through
+`frontend/src/api.ts`, into the backend router and support modules that handle
+sessions, persistence, email, and document Q&A.
 
 ```mermaid
 flowchart TB
@@ -181,6 +191,11 @@ flowchart TB
 ```
 
 ### Core Data And Workspace Flow
+
+This diagram summarizes the core local data model and the workspace document
+flow. It shows how users, course preferences, groups, membership applications,
+uploaded documents, comments, local files, and optional OpenAI vector-store IDs
+relate to each other.
 
 ```mermaid
 flowchart TB
