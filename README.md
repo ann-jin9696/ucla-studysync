@@ -108,6 +108,23 @@ npm test
 npm run build
 ```
 
+Playwright end-to-end:
+
+```sh
+cd backend
+uv sync --dev
+cd ../frontend
+npm ci
+npx playwright install chromium
+npm run test:e2e
+```
+
+The Playwright config starts the FastAPI backend on `127.0.0.1:8000` and the
+Vite frontend on `127.0.0.1:5173` automatically. Keep those ports free before
+running the suite so the configured test servers can start cleanly. The e2e
+suite uses SQLite at `backend/data/studysync-e2e.sqlite3` and disables external
+email and document Q&A calls.
+
 ## Architecture
 
 ### Local Runtime Topology
