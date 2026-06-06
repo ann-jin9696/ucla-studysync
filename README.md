@@ -145,6 +145,153 @@ flowchart LR
     FastAPI -. optional .-> OpenAI["OpenAI Files, Vector Stores,\nand Responses APIs"]
     FastAPI -. production/debug only .-> Oracle["Oracle ATP/ADB"]
 ```
+### UML Sequence Diagram
+This diagram traces a new user through the full flow from account creation to group collaboration. It covers five phases: signup with UCLA email validation, email verification, profile setup with course enrollment and study preferences, group discovery with preference-based filtering and join requests, and workspace collaboration including document upload, AI summary, commenting, and AI-powered Q&A over group materials. Synchronous calls use solid arrows, asynchronous background tasks use open arrows, and return
+values use dashed lines.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant FE as React Frontend
+    participant BE as FastAPI Backend
+    participant DB as SQLite DB
+    participant Email as Email Service (SMTP)
+    participant OpenAI as OpenAI API
+
+    %% Phase 1: Sign Up
+    Note over User, OpenAI: Phase 1 — Sign Up
+
+    User->>FE: Fill signup form (name, UCLA email, password)
+    FE->>BE: POST /api/auth/signup
+
+    BE->>BE: Validate UCLA email domain
+    BE->>BE: Hash password (bcrypt)
+
+    alt Email already registered
+        BE--)FE: 409 Conflict
+        FE--)User: "Account already exists"
+    else New user
+        BE->>DB: INSERT INTO users (email_verified=0)
+        BE->>DB: INSERT INTO email_verification_tokens
+        BE->>Email: Send verification email with token
+        BE--)FE: AuthResponse + Set-Cookie (studysync_session)
+        FE--)User: Redirect to /dashboard (unverified)
+    end
+
+
+    %% Phase 2: Email Verification 
+    Note over User, OpenAI: Phase 2 — Email Verification
+
+    User->>FE: Click verification link from email
+    FE->>BE: POST /api/auth/email-verification/confirm {token}
+
+    BE->>DB: SELECT from email_verification_tokens
+
+    alt Token expired or already used
+        DB--)BE: No matching row
+        BE--)FE: 400 Bad Request
+        FE--)User: "Link is invalid or expired"
+    else Token valid
+        DB--)BE: token row (user_id)
+        BE->>DB: UPDATE users SET email_verified=1
+        BE->>DB: UPDATE token SET used_at=NOW
+        BE--)FE: AuthResponse + new session cookie
+        FE--)User: ProfileGate → redirect to /profile/setup
+    end
+
+
+    %% Phase 3: Profile Setup 
+ 
+    Note over User, OpenAI: Phase 3 — Profile Setup
+
+    User->>FE: Select courses, study goals, pace, group size pref
+    FE->>BE: PUT /api/profile/me {courses: [...]}
+    BE->>BE: Validate payload (normalize course codes, enums)
+
+    loop For each course in payload
+        BE->>DB: INSERT OR IGNORE INTO courses
+        BE->>DB: SELECT course id
+        BE->>DB: INSERT INTO user_course (goals, pace, size_pref)
+    end
+
+    BE--)FE: ProfileResponse {courses, has_basic_profile: true}
+    FE--)User: ProfileGate passes → redirect to /dashboard
+
+    %% Phase 4: Group Matching & Joining 
+   
+    Note over User, OpenAI: Phase 4 — Group Matching & Joining
+
+    User->>FE: Open GroupMatchingModule, select a course
+    FE->>BE: GET /api/matching/groups?user_course_id=X
+    BE->>DB: SELECT user_course WHERE id=X
+    BE->>DB: SELECT groups + member counts for this course
+
+    loop For each group
+        BE->>DB: SELECT member user_course rows (goals, pace)
+        BE->>BE: Compute avg pace, top goals, group size
+    end
+
+    opt User applied filters (goals, pace, or size)
+        BE->>BE: Filter out non-matching groups
+    end
+
+    BE--)FE: GroupDirectoryResponse[]
+    FE--)User: Display matched groups
+
+    User->>FE: Click "Join" on a group
+    FE->>BE: POST /api/groups/{id}/join
+
+    alt Already a member
+        BE--)FE: 409 "Already in this group"
+    else Already has pending request for this course
+        BE--)FE: 409 "Already have a pending application"
+    else Eligible
+        BE->>DB: INSERT INTO join_requests (status=pending)
+
+        opt Group owner has notifications enabled
+            BE->>Email: Notify owner of new application
+        end
+
+        BE--)FE: JoinRequestResponse {status: pending}
+        FE--)User: Show "Request Pending" badge
+    end
+
+
+    %% Phase 5: Workspace Collaboration & AI
+    Note over User, OpenAI: Phase 5 — Workspace Collaboration & AI
+
+    User->>FE: Upload document (PDF, PNG, JPG, TXT, MD)
+    FE->>BE: POST /api/groups/{id}/documents (multipart form)
+    BE->>BE: Validate membership, file type, storage limit
+    BE->>DB: INSERT INTO documents (index_status='indexing')
+    BE--)FE: DocumentResponse
+
+    BE-)OpenAI: Background: index document into vector store
+    OpenAI--)BE: IndexedDocument (file_id, status)
+    opt index status = ready
+        BE-)OpenAI: Background: generate AI summary
+        OpenAI--)BE: Summary text
+    end
+    BE->>DB: UPDATE documents SET index_status='ready', ai_summary=...
+
+    User->>FE: Add comment on document
+    FE->>BE: POST /api/groups/{id}/documents/{id}/comments
+    BE->>DB: INSERT INTO comments
+    BE--)FE: CommentResponse
+
+    User->>FE: Ask AI a question about group documents
+    FE->>BE: POST /api/groups/{id}/qa {question}
+    BE->>DB: SELECT indexed documents for group
+
+    alt No indexed documents ready
+        BE--)FE: 409 "No indexed documents ready"
+    else Documents available
+        BE->>OpenAI: Query vector store with question
+        OpenAI--)BE: Answer + source snippets
+        BE--)FE: DocumentQAResponse {answer, sources}
+        FE--)User: Display AI answer with cited sources
+    end
+```
 
 ### Frontend And API Module Map
 
