@@ -410,3 +410,10 @@ flowchart TB
 
 - [Backend database mode](backend/README.md#database-mode)
 - [Part 4 workspace module](docs/part4-workspace.md)
+
+## AI Assistance Disclosure
+
+Generative AI was used to help plan, debug, review, and suggest code.
+Approximately 80% of the code was AI-assisted, while the remaining 20% was
+written directly. All AI-assisted changes were reviewed, tested, and adapted
+for the StudySync codebase, and responsibility is taken for the final code.
