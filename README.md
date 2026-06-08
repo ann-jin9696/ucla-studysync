@@ -5,6 +5,8 @@ authentication, profile setup, study group matching, join request workflows, and
 shared group workspaces for uploading, searching, previewing, discussing, and
 asking AI-assisted questions about study materials.
 
+Production: [studysync.bruinapps.com](https://studysync.bruinapps.com)
+
 ## Local Prerequisites
 
 - Python 3.11 or newer
