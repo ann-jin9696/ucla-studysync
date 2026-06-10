@@ -197,6 +197,38 @@ class DocumentQAResponse(BaseModel):
     sources: list[DocumentQASource]
 
 
+class AISummaryCreateRequest(BaseModel):
+    topic: str | None = Field(default=None, max_length=160)
+    document_id: int | None = Field(default=None, gt=0)
+
+
+class KeyIdeaResponse(BaseModel):
+    id: int
+    ai_summary_id: int
+    content: str
+    position: int
+
+
+class AISummaryResponse(BaseModel):
+    id: int
+    group_id: int
+    creator_id: int
+    document_id: int | None
+    topic: str | None
+    summary_text: str
+    key_ideas: list[KeyIdeaResponse]
+    saved: bool = False
+    created_at: str
+
+
+class SavedSummaryResponse(BaseModel):
+    id: int
+    ai_summary_id: int
+    user_id: int
+    saved_at: str
+    summary: AISummaryResponse
+
+
 class GroupActivityResponse(BaseModel):
     id: str
     activity_type: str
