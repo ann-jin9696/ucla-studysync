@@ -1664,3 +1664,96 @@ def create_comment(
     ).fetchone()
 
     return serialize_comment(row)
+
+@router.put(
+    "/comments/{comment_id}",
+    response_model=CommentResponse,
+)
+def update_comment(
+    comment_id: int,
+    payload: CommentCreateRequest,
+    db: sqlite3.Connection = Depends(get_db),
+    user: sqlite3.Row = Depends(get_current_user),
+) -> CommentResponse:
+    content = " ".join(payload.content.strip().split())
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Comment content is required.",
+        )
+
+    comment = db.execute(
+        "SELECT id, author_id FROM comments WHERE id = ?",
+        (comment_id,),
+    ).fetchone()
+
+    if not comment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Comment not found.",
+        )
+
+    # 🛡️ SECURITY GUARD: Check ownership
+    if int(comment["author_id"]) != int(user["id"]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to edit this comment.",
+        )
+
+    db.execute(
+        "UPDATE comments SET content = ? WHERE id = ?",
+        (content, comment_id),
+    )
+    db.commit()
+
+    row = db.execute(
+        """
+        SELECT
+            comments.id,
+            comments.document_id,
+            comments.author_id,
+            users.full_name AS author_name,
+            comments.content,
+            comments.created_at
+        FROM comments
+        JOIN users ON users.id = comments.author_id
+        WHERE comments.id = ?
+        """,
+        (comment_id,),
+    ).fetchone()
+
+    return serialize_comment(row)
+
+
+@router.delete(
+    "/comments/{comment_id}",
+    response_class=Response,
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_comment(
+    comment_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+    user: sqlite3.Row = Depends(get_current_user),
+) -> Response:
+    comment = db.execute(
+        "SELECT id, author_id FROM comments WHERE id = ?",
+        (comment_id,),
+    ).fetchone()
+
+    if not comment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Comment not found.",
+        )
+
+    # 🛡️ SECURITY GUARD: Check ownership
+    if int(comment["author_id"]) != int(user["id"]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to delete this comment.",
+        )
+
+    db.execute("DELETE FROM comments WHERE id = ?", (comment_id,))
+    db.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

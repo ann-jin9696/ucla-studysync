@@ -6,6 +6,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { groupApi } from '../api';
 import { WorkspaceModule } from './WorkspaceModule';
 
+vi.mock('./AuthProvider', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./AuthProvider')>();
+  return {
+    ...actual,
+    useAuth: () => ({
+      user: { id: 101, full_name: 'Test User' },
+    }),
+  };
+});
+
 const apiMocks = vi.hoisted(() => ({
   askDocuments: vi.fn(),
   createComment: vi.fn(),

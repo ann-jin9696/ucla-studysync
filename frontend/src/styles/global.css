@@ -1312,11 +1312,29 @@ h1 {
     transform 160ms ease;
 }
 
-.comment-item div {
+.comment-header {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 12px;
   margin-bottom: 8px;
+}
+
+.comment-author-info {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.comment-date {
+  flex: 0 0 auto;
+  color: #769087;
+  font-size: 0.82rem;
+}
+
+.comment-buttons {
+  display: flex;
+  gap: 8px;
 }
 
 .comment-item strong {
@@ -1333,6 +1351,12 @@ h1 {
   margin-bottom: 0;
   color: #4f665f;
   line-height: 1.62;
+}
+
+.comment-edit-buttons {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
 }
 
 .comment-composer {

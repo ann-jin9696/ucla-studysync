@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
-import { authApi, LoginInput, SignupInput, User } from '../api';
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import { authApi, LoginInput, SignupInput, User } from "../api";
 
 type AuthContextValue = {
   user: User | null;
@@ -53,7 +53,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, signup, login, logout, refreshUser, setAuthenticatedUser }),
+    () => ({
+      user,
+      loading,
+      signup,
+      login,
+      logout,
+      refreshUser,
+      setAuthenticatedUser,
+    }),
     [user, loading],
   );
 
@@ -63,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used inside AuthProvider');
+    throw new Error("useAuth must be used inside AuthProvider");
   }
   return context;
 }

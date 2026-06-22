@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ChangeEvent, ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import {
   Button,
   Card,
@@ -12,7 +12,7 @@ import {
   Spin,
   Tag,
   message,
-} from 'antd';
+} from "antd";
 import {
   ChatCircleText,
   FileArrowUp,
@@ -23,13 +23,14 @@ import {
   Sparkle,
   Trash,
   UsersThree,
-} from '@phosphor-icons/react';
-import type { Group, GroupDetail, GroupDocument } from '../api';
-import { groupApi } from '../api';
-import { parseApiTimestamp } from '../dateTime';
-import { PACE_OPTIONS, STUDY_GOAL_OPTIONS } from '../profileOptions';
+} from "@phosphor-icons/react";
+import type { Group, GroupDetail, GroupDocument } from "../api";
+import { groupApi } from "../api";
+import { parseApiTimestamp } from "../dateTime";
+import { PACE_OPTIONS, STUDY_GOAL_OPTIONS } from "../profileOptions";
+import { useAuth } from "../components/AuthProvider";
 
-export type WorkspaceModuleMode = 'workspace' | 'discussion';
+export type WorkspaceModuleMode = "workspace" | "discussion";
 
 type UploadFormValues = {
   title: string;
@@ -37,28 +38,30 @@ type UploadFormValues = {
 };
 
 const DOCUMENT_TYPES = [
-  { label: 'Notes', value: 'notes' },
-  { label: 'Slides', value: 'slides' },
-  { label: 'Worksheet', value: 'worksheet' },
-  { label: 'Review Guide', value: 'review' },
-  { label: 'Other', value: 'other' },
+  { label: "Notes", value: "notes" },
+  { label: "Slides", value: "slides" },
+  { label: "Worksheet", value: "worksheet" },
+  { label: "Review Guide", value: "review" },
+  { label: "Other", value: "other" },
 ];
-const SUPPORTED_UPLOAD_EXTENSIONS = ['.pdf', '.png', '.jpg', '.txt', '.md'];
-const SUPPORTED_UPLOAD_ACCEPT = SUPPORTED_UPLOAD_EXTENSIONS.join(',');
-const SUPPORTED_UPLOAD_LABEL = 'PDF, PNG, JPG, TXT, or MD';
+const SUPPORTED_UPLOAD_EXTENSIONS = [".pdf", ".png", ".jpg", ".txt", ".md"];
+const SUPPORTED_UPLOAD_ACCEPT = SUPPORTED_UPLOAD_EXTENSIONS.join(",");
+const SUPPORTED_UPLOAD_LABEL = "PDF, PNG, JPG, TXT, or MD";
 const MAX_UPLOAD_FILE_MB = 50;
 
 const STUDY_GOAL_LABELS = new Map(
   STUDY_GOAL_OPTIONS.map((option) => [option.value, option.label]),
 );
-const PACE_LABELS = new Map(PACE_OPTIONS.map((option) => [option.value, option.label]));
+const PACE_LABELS = new Map(
+  PACE_OPTIONS.map((option) => [option.value, option.label]),
+);
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   }).format(parseApiTimestamp(value));
 }
 
@@ -72,37 +75,39 @@ function formatGoal(value: string) {
 
 function formatPace(value: string | null) {
   if (!value) {
-    return 'No pace yet';
+    return "No pace yet";
   }
   return PACE_LABELS.get(value) ?? value;
 }
 
 function formatGroupSizeBucket(value: string) {
-  if (value === 'small') {
-    return 'Small (<5)';
+  if (value === "small") {
+    return "Small (<5)";
   }
-  if (value === 'medium') {
-    return 'Medium (5-10)';
+  if (value === "medium") {
+    return "Medium (5-10)";
   }
-  if (value === 'large') {
-    return 'Large (>10)';
+  if (value === "large") {
+    return "Large (>10)";
   }
-  return 'Unknown size';
+  return "Unknown size";
 }
 
 function documentIndexTag(document: GroupDocument) {
-  if (document.index_status === 'ready') {
-    return { color: 'cyan', label: 'Ready' };
+  if (document.index_status === "ready") {
+    return { color: "cyan", label: "Ready" };
   }
-  if (document.index_status === 'indexing') {
-    return { color: 'gold', label: 'Indexing' };
+  if (document.index_status === "indexing") {
+    return { color: "gold", label: "Indexing" };
   }
-  return { color: 'red', label: 'Q&A failed' };
+  return { color: "red", label: "Q&A failed" };
 }
 
 function getFileExtension(fileName: string) {
-  const extensionStart = fileName.lastIndexOf('.');
-  return extensionStart >= 0 ? fileName.slice(extensionStart).toLowerCase() : '';
+  const extensionStart = fileName.lastIndexOf(".");
+  return extensionStart >= 0
+    ? fileName.slice(extensionStart).toLowerCase()
+    : "";
 }
 
 function isSupportedUploadFile(file: File) {
@@ -130,10 +135,13 @@ function isTextPreviewDocument(document: GroupDocument) {
 }
 
 function classNames(...names: Array<string | false | null | undefined>) {
-  return names.filter(Boolean).join(' ');
+  return names.filter(Boolean).join(" ");
 }
 
-function getActivityTargetId(activityId: string | null | undefined, prefix: string) {
+function getActivityTargetId(
+  activityId: string | null | undefined,
+  prefix: string,
+) {
   const match = activityId?.match(new RegExp(`^${prefix}-(\\d+)$`));
   return match ? Number(match[1]) : null;
 }
@@ -171,7 +179,7 @@ function renderHeading(level: number, content: string, key: string) {
 }
 
 function renderMarkdownBlocks(markdown: string) {
-  const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+  const lines = markdown.replace(/\r\n/g, "\n").split("\n");
   const blocks: ReactNode[] = [];
   let index = 0;
 
@@ -185,10 +193,10 @@ function renderMarkdownBlocks(markdown: string) {
       continue;
     }
 
-    if (trimmed.startsWith('```')) {
+    if (trimmed.startsWith("```")) {
       const codeLines: string[] = [];
       index += 1;
-      while (index < lines.length && !lines[index].trim().startsWith('```')) {
+      while (index < lines.length && !lines[index].trim().startsWith("```")) {
         codeLines.push(lines[index]);
         index += 1;
       }
@@ -197,7 +205,7 @@ function renderMarkdownBlocks(markdown: string) {
       }
       blocks.push(
         <pre key={blockKey}>
-          <code>{codeLines.join('\n')}</code>
+          <code>{codeLines.join("\n")}</code>
         </pre>,
       );
       continue;
@@ -213,7 +221,7 @@ function renderMarkdownBlocks(markdown: string) {
     if (/^[-*]\s+/.test(trimmed)) {
       const items: string[] = [];
       while (index < lines.length && /^[-*]\s+/.test(lines[index].trim())) {
-        items.push(lines[index].trim().replace(/^[-*]\s+/, ''));
+        items.push(lines[index].trim().replace(/^[-*]\s+/, ""));
         index += 1;
       }
       blocks.push(
@@ -229,7 +237,7 @@ function renderMarkdownBlocks(markdown: string) {
     if (/^\d+\.\s+/.test(trimmed)) {
       const items: string[] = [];
       while (index < lines.length && /^\d+\.\s+/.test(lines[index].trim())) {
-        items.push(lines[index].trim().replace(/^\d+\.\s+/, ''));
+        items.push(lines[index].trim().replace(/^\d+\.\s+/, ""));
         index += 1;
       }
       blocks.push(
@@ -245,10 +253,12 @@ function renderMarkdownBlocks(markdown: string) {
     if (/^>\s?/.test(trimmed)) {
       const quoteLines: string[] = [];
       while (index < lines.length && /^>\s?/.test(lines[index].trim())) {
-        quoteLines.push(lines[index].trim().replace(/^>\s?/, ''));
+        quoteLines.push(lines[index].trim().replace(/^>\s?/, ""));
         index += 1;
       }
-      blocks.push(<blockquote key={blockKey}>{quoteLines.join(' ')}</blockquote>);
+      blocks.push(
+        <blockquote key={blockKey}>{quoteLines.join(" ")}</blockquote>,
+      );
       continue;
     }
 
@@ -261,12 +271,12 @@ function renderMarkdownBlocks(markdown: string) {
       !/^[-*]\s+/.test(lines[index].trim()) &&
       !/^\d+\.\s+/.test(lines[index].trim()) &&
       !/^>\s?/.test(lines[index].trim()) &&
-      !lines[index].trim().startsWith('```')
+      !lines[index].trim().startsWith("```")
     ) {
       paragraphLines.push(lines[index].trim());
       index += 1;
     }
-    blocks.push(<p key={blockKey}>{paragraphLines.join(' ')}</p>);
+    blocks.push(<p key={blockKey}>{paragraphLines.join(" ")}</p>);
   }
 
   return blocks.length > 0 ? blocks : <p>No preview content available.</p>;
@@ -289,19 +299,25 @@ export function WorkspaceModule({
   focusRequestId = 0,
   onActivityChange,
 }: WorkspaceModuleProps) {
+  const { user } = useAuth();
   const shellRef = useRef<HTMLElement | null>(null);
   const [messageApi, contextHolder] = message.useMessage();
   const [uploadForm] = Form.useForm<UploadFormValues>();
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [documents, setDocuments] = useState<GroupDocument[]>([]);
-  const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(
+    null,
+  );
   const [comments, setComments] = useState<
     Awaited<ReturnType<typeof groupApi.listComments>>
   >([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [commentText, setCommentText] = useState('');
-  const [qaQuestion, setQaQuestion] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [commentText, setCommentText] = useState("");
+  const [editCommentId, setEditCommentId] = useState<number | null>(null);
+  const [editCommentText, setEditCommentText] = useState("");
+  const [editingComment, setEditingComment] = useState(false);
+  const [qaQuestion, setQaQuestion] = useState("");
   const [qaAnswer, setQaAnswer] = useState<Awaited<
     ReturnType<typeof groupApi.askDocuments>
   > | null>(null);
@@ -313,13 +329,16 @@ export function WorkspaceModule({
   const [uploading, setUploading] = useState(false);
   const [postingComment, setPostingComment] = useState(false);
   const [askingDocuments, setAskingDocuments] = useState(false);
-  const [previewDocument, setPreviewDocument] = useState<GroupDocument | null>(null);
+  const [previewDocument, setPreviewDocument] = useState<GroupDocument | null>(
+    null,
+  );
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewText, setPreviewText] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [groupDetailOpen, setGroupDetailOpen] = useState(false);
-  const [selectedGroupDetail, setSelectedGroupDetail] = useState<GroupDetail | null>(null);
+  const [selectedGroupDetail, setSelectedGroupDetail] =
+    useState<GroupDetail | null>(null);
   const [loadingGroupDetail, setLoadingGroupDetail] = useState(false);
 
   useEffect(() => {
@@ -347,7 +366,7 @@ export function WorkspaceModule({
       }
       try {
         const response = await fetch(fileUrl, {
-          credentials: 'include',
+          credentials: "include",
           signal: controller.signal,
         });
         if (!response.ok) {
@@ -356,11 +375,11 @@ export function WorkspaceModule({
 
         setPreviewText(await response.text());
       } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') {
+        if (error instanceof DOMException && error.name === "AbortError") {
           return;
         }
-        console.error('File preview failed:', error);
-        setPreviewError('Could not load this file preview.');
+        console.error("File preview failed:", error);
+        setPreviewError("Could not load this file preview.");
       } finally {
         setLoadingPreview(false);
       }
@@ -379,21 +398,23 @@ export function WorkspaceModule({
   );
 
   const selectedDocument = useMemo(
-    () => documents.find((document) => document.id === selectedDocumentId) ?? null,
+    () =>
+      documents.find((document) => document.id === selectedDocumentId) ?? null,
     [documents, selectedDocumentId],
   );
-  const moduleTitle = mode === 'workspace' ? 'Shared workspaces' : 'Group discussion';
+  const moduleTitle =
+    mode === "workspace" ? "Shared workspaces" : "Group discussion";
   const moduleDescription =
-    mode === 'workspace'
-      ? 'Choose a group workspace and manage its shared files.'
-      : 'Choose a group workspace and keep comments beside its materials.';
+    mode === "workspace"
+      ? "Choose a group workspace and manage its shared files."
+      : "Choose a group workspace and keep comments beside its materials.";
   const focusedCommentId = useMemo(
-    () => getActivityTargetId(focusActivityId, 'comment'),
+    () => getActivityTargetId(focusActivityId, "comment"),
     [focusActivityId],
   );
   const focusedDocumentId = useMemo(
     () =>
-      getActivityTargetId(focusActivityId, 'document') ??
+      getActivityTargetId(focusActivityId, "document") ??
       (focusActivityId ? initialDocumentId : null),
     [focusActivityId, initialDocumentId],
   );
@@ -404,7 +425,10 @@ export function WorkspaceModule({
       const response = await groupApi.listMyGroups();
       setGroups(response);
       setSelectedGroupId((currentId) => {
-        if (initialGroupId && response.some((group) => group.id === initialGroupId)) {
+        if (
+          initialGroupId &&
+          response.some((group) => group.id === initialGroupId)
+        ) {
           return initialGroupId;
         }
         if (response.some((group) => group.id === currentId)) {
@@ -413,7 +437,9 @@ export function WorkspaceModule({
         return response[0]?.id ?? null;
       });
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : 'Could not load groups.');
+      messageApi.error(
+        error instanceof Error ? error.message : "Could not load groups.",
+      );
     } finally {
       setLoadingGroups(false);
     }
@@ -440,7 +466,9 @@ export function WorkspaceModule({
       setSelectedDocumentId((currentId) => {
         if (
           initialDocumentId &&
-          response.documents.some((document) => document.id === initialDocumentId)
+          response.documents.some(
+            (document) => document.id === initialDocumentId,
+          )
         ) {
           return initialDocumentId;
         }
@@ -450,7 +478,9 @@ export function WorkspaceModule({
         return response.documents[0]?.id ?? null;
       });
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : 'Could not load documents.');
+      messageApi.error(
+        error instanceof Error ? error.message : "Could not load documents.",
+      );
     } finally {
       if (showLoading) {
         setLoadingDocuments(false);
@@ -469,7 +499,7 @@ export function WorkspaceModule({
       setSelectedGroupDetail(await groupApi.getDetail(selectedGroupId));
     } catch (error) {
       messageApi.error(
-        error instanceof Error ? error.message : 'Could not load group info.',
+        error instanceof Error ? error.message : "Could not load group info.",
       );
     } finally {
       setLoadingGroupDetail(false);
@@ -478,11 +508,11 @@ export function WorkspaceModule({
 
   async function handleUpload(values: UploadFormValues) {
     if (!selectedGroupId) {
-      messageApi.warning('Choose a group first.');
+      messageApi.warning("Choose a group first.");
       return;
     }
     if (!uploadFile) {
-      messageApi.warning('Choose a file to upload.');
+      messageApi.warning("Choose a file to upload.");
       return;
     }
 
@@ -494,7 +524,9 @@ export function WorkspaceModule({
         document_type: values.document_type,
         file: uploadFile,
       });
-      messageApi.success('Document uploaded. Q&A indexing will continue in the background.');
+      messageApi.success(
+        "Document uploaded. Q&A indexing will continue in the background.",
+      );
       uploadForm.resetFields();
       setUploadFile(null);
       setFileInputKey((key) => key + 1);
@@ -502,7 +534,9 @@ export function WorkspaceModule({
       setSelectedDocumentId(uploaded.id);
       onActivityChange?.();
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : 'Could not upload document.');
+      messageApi.error(
+        error instanceof Error ? error.message : "Could not upload document.",
+      );
     } finally {
       setUploading(false);
     }
@@ -511,15 +545,20 @@ export function WorkspaceModule({
   function handleDeleteDocument(documentToDelete: GroupDocument) {
     Modal.confirm({
       title: `Delete ${documentToDelete.title}?`,
-      content: 'This removes the shared file and its comments from the group.',
-      okText: 'Delete',
+      content: "This removes the shared file and its comments from the group.",
+      okText: "Delete",
       okButtonProps: { danger: true },
       async onOk() {
         try {
-          await groupApi.deleteDocument(documentToDelete.group_id, documentToDelete.id);
-          messageApi.success('Document deleted.');
+          await groupApi.deleteDocument(
+            documentToDelete.group_id,
+            documentToDelete.id,
+          );
+          messageApi.success("Document deleted.");
           setPreviewDocument((currentDocument) =>
-            currentDocument?.id === documentToDelete.id ? null : currentDocument,
+            currentDocument?.id === documentToDelete.id
+              ? null
+              : currentDocument,
           );
           setComments((currentComments) =>
             selectedDocumentId === documentToDelete.id ? [] : currentComments,
@@ -528,7 +567,9 @@ export function WorkspaceModule({
           onActivityChange?.();
         } catch (error) {
           messageApi.error(
-            error instanceof Error ? error.message : 'Could not delete document.',
+            error instanceof Error
+              ? error.message
+              : "Could not delete document.",
           );
         }
       },
@@ -548,13 +589,56 @@ export function WorkspaceModule({
         commentText,
       );
       setComments((currentComments) => [...currentComments, created]);
-      setCommentText('');
+      setCommentText("");
       onActivityChange?.();
-      messageApi.success('Comment added.');
+      messageApi.success("Comment added.");
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : 'Could not add comment.');
+      messageApi.error(
+        error instanceof Error ? error.message : "Could not add comment.",
+      );
     } finally {
       setPostingComment(false);
+    }
+  }
+
+  async function handleUpdateComment(commentId: number) {
+    if (!editCommentText.trim()) return;
+    setEditingComment(true);
+    try {
+      await groupApi.updateComment(commentId, editCommentText);
+
+      messageApi.success("Comment updated!");
+      setEditCommentId(null);
+      setEditCommentText("");
+
+      if (selectedGroupId && selectedDocumentId) {
+        const refreshComments = await groupApi.listComments(
+          selectedGroupId,
+          selectedDocumentId,
+        );
+        setComments(refreshComments);
+      }
+      onActivityChange?.();
+    } catch (error) {
+      messageApi.error(
+        error instanceof Error ? error.message : "Could not update comment",
+      );
+    } finally {
+      setEditingComment(false);
+    }
+  }
+
+  async function handleDeleteComment(commentId: number) {
+    try {
+      await groupApi.deleteComment(commentId);
+      messageApi.success("Comment Deleted!");
+
+      setComments((curr) => curr.filter((c) => c.id !== commentId));
+      onActivityChange?.();
+    } catch (error) {
+      messageApi.error(
+        error instanceof Error ? error.message : "Couldn't delete comment",
+      );
     }
   }
 
@@ -567,7 +651,9 @@ export function WorkspaceModule({
     try {
       setQaAnswer(await groupApi.askDocuments(selectedGroupId, qaQuestion));
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : 'Could not ask documents.');
+      messageApi.error(
+        error instanceof Error ? error.message : "Could not ask documents.",
+      );
     } finally {
       setAskingDocuments(false);
     }
@@ -577,13 +663,13 @@ export function WorkspaceModule({
     const nextFile = event.target.files?.[0] ?? null;
     if (nextFile && !isSupportedUploadFile(nextFile)) {
       setUploadFile(null);
-      event.target.value = '';
+      event.target.value = "";
       messageApi.warning(`Choose a ${SUPPORTED_UPLOAD_LABEL} file.`);
       return;
     }
     if (nextFile && nextFile.size > MAX_UPLOAD_FILE_MB * 1024 * 1024) {
       setUploadFile(null);
-      event.target.value = '';
+      event.target.value = "";
       messageApi.warning(`Choose a file ${MAX_UPLOAD_FILE_MB} MB or smaller.`);
       return;
     }
@@ -617,25 +703,28 @@ export function WorkspaceModule({
       return;
     }
 
-    setSearchQuery('');
-    void loadDocuments('', selectedGroupId);
+    setSearchQuery("");
+    void loadDocuments("", selectedGroupId);
   }, [initialDocumentId, initialGroupId, selectedGroupId]);
 
   useEffect(() => {
-    setSearchQuery('');
-    setCommentText('');
-    setQaQuestion('');
+    setSearchQuery("");
+    setCommentText("");
+    setQaQuestion("");
     setQaAnswer(null);
     setPreviewDocument(null);
     setGroupDetailOpen(false);
     setSelectedGroupDetail(null);
     setDocuments([]);
     setSelectedDocumentId(null);
-    void loadDocuments('', selectedGroupId);
+    void loadDocuments("", selectedGroupId);
   }, [selectedGroupId]);
 
   useEffect(() => {
-    if (!selectedGroupId || !documents.some((document) => document.index_status === 'indexing')) {
+    if (
+      !selectedGroupId ||
+      !documents.some((document) => document.index_status === "indexing")
+    ) {
       return;
     }
 
@@ -657,14 +746,17 @@ export function WorkspaceModule({
 
       setLoadingComments(true);
       try {
-        const response = await groupApi.listComments(selectedGroupId, selectedDocumentId);
+        const response = await groupApi.listComments(
+          selectedGroupId,
+          selectedDocumentId,
+        );
         if (!shouldIgnore) {
           setComments(response);
         }
       } catch (error) {
         if (!shouldIgnore) {
           messageApi.error(
-            error instanceof Error ? error.message : 'Could not load comments.',
+            error instanceof Error ? error.message : "Could not load comments.",
           );
         }
       } finally {
@@ -688,7 +780,7 @@ export function WorkspaceModule({
 
     let selector: string | null = null;
 
-    if (mode === 'discussion') {
+    if (mode === "discussion") {
       if (
         !focusedCommentId ||
         loadingComments ||
@@ -710,7 +802,7 @@ export function WorkspaceModule({
 
     const scrollTimer = window.setTimeout(() => {
       const target = shellRef.current?.querySelector<HTMLElement>(selector);
-      target?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+      target?.scrollIntoView?.({ behavior: "smooth", block: "center" });
       target?.focus?.({ preventScroll: true });
     }, 80);
 
@@ -751,7 +843,11 @@ export function WorkspaceModule({
             ) : previewError ? (
               <div className="document-preview-fallback">
                 <p>{previewError}</p>
-                <Button href={previewUrl ?? undefined} target="_blank" type="primary">
+                <Button
+                  href={previewUrl ?? undefined}
+                  target="_blank"
+                  type="primary"
+                >
                   Open file
                 </Button>
               </div>
@@ -788,11 +884,13 @@ export function WorkspaceModule({
               <pre className="document-preview-text">{previewText}</pre>
             ) : isMarkdownDocument(previewDocument) ? (
               <div className="document-preview-markdown">
-                {renderMarkdownBlocks(previewText ?? '')}
+                {renderMarkdownBlocks(previewText ?? "")}
               </div>
             ) : (
               <div className="document-preview-fallback">
-                <p>This file type cannot be previewed directly in the browser.</p>
+                <p>
+                  This file type cannot be previewed directly in the browser.
+                </p>
                 <Button
                   href={previewUrl ?? undefined}
                   target="_blank"
@@ -820,7 +918,7 @@ export function WorkspaceModule({
         className="group-detail-drawer"
         onClose={() => setGroupDetailOpen(false)}
         open={groupDetailOpen}
-        title={selectedGroupDetail?.name ?? 'Group info'}
+        title={selectedGroupDetail?.name ?? "Group info"}
         width={460}
       >
         <Spin spinning={loadingGroupDetail}>
@@ -848,8 +946,14 @@ export function WorkspaceModule({
               <section className="group-detail-section">
                 <h3>Group properties</h3>
                 <div className="group-detail-tags">
-                  <Tag>{formatGroupSizeBucket(selectedGroupDetail.group_size_bucket)}</Tag>
-                  <Tag>{formatPace(selectedGroupDetail.average_pace_preference)}</Tag>
+                  <Tag>
+                    {formatGroupSizeBucket(
+                      selectedGroupDetail.group_size_bucket,
+                    )}
+                  </Tag>
+                  <Tag>
+                    {formatPace(selectedGroupDetail.average_pace_preference)}
+                  </Tag>
                   {selectedGroupDetail.average_pace_score !== null && (
                     <Tag>Avg {selectedGroupDetail.average_pace_score}</Tag>
                   )}
@@ -904,7 +1008,7 @@ export function WorkspaceModule({
         <Card className="workspace-stat">
           <NotePencil size={28} weight="duotone" />
           <strong>{documents.length}</strong>
-          <span>{selectedGroup ? 'shared documents' : 'select a group'}</span>
+          <span>{selectedGroup ? "shared documents" : "select a group"}</span>
         </Card>
       </div>
 
@@ -920,14 +1024,17 @@ export function WorkspaceModule({
                 <UsersThree size={24} weight="duotone" />
                 <h2>Workspaces</h2>
               </div>
-              <div className="workspace-switcher-list" aria-label="Group workspaces">
+              <div
+                className="workspace-switcher-list"
+                aria-label="Group workspaces"
+              >
                 {groups.map((group) => (
                   <button
                     aria-pressed={group.id === selectedGroupId}
                     className={
                       group.id === selectedGroupId
-                        ? 'workspace-switcher-item selected'
-                        : 'workspace-switcher-item'
+                        ? "workspace-switcher-item selected"
+                        : "workspace-switcher-item"
                     }
                     key={group.id}
                     onClick={() => setSelectedGroupId(group.id)}
@@ -944,7 +1051,11 @@ export function WorkspaceModule({
               {selectedGroup && (
                 <div className="workspace-active-heading">
                   <div>
-                    <span>{mode === 'workspace' ? 'Current workspace' : 'Current group'}</span>
+                    <span>
+                      {mode === "workspace"
+                        ? "Current workspace"
+                        : "Current group"}
+                    </span>
                     <h3>{selectedGroup.name}</h3>
                     <p>{formatGroupMeta(selectedGroup)}</p>
                   </div>
@@ -961,7 +1072,7 @@ export function WorkspaceModule({
                 <Card className="workspace-tool-card">
                   <Empty description="Select a group workspace" />
                 </Card>
-              ) : mode === 'workspace' ? (
+              ) : mode === "workspace" ? (
                 <div className="workspace-layout workspace-materials-layout">
                   <Card className="workspace-tool-card upload-material-card">
                     <div className="tool-card-heading">
@@ -972,12 +1083,14 @@ export function WorkspaceModule({
                       form={uploadForm}
                       layout="vertical"
                       onFinish={handleUpload}
-                      initialValues={{ document_type: 'notes' }}
+                      initialValues={{ document_type: "notes" }}
                     >
                       <Form.Item
                         label="Title"
                         name="title"
-                        rules={[{ required: true, message: 'Add a document title.' }]}
+                        rules={[
+                          { required: true, message: "Add a document title." },
+                        ]}
                       >
                         <Input placeholder="Week 5 review notes" />
                       </Form.Item>
@@ -991,10 +1104,18 @@ export function WorkspaceModule({
                           type="file"
                           onChange={handleFileChange}
                         />
-                        <span>{uploadFile ? uploadFile.name : 'Choose a file'}</span>
+                        <span>
+                          {uploadFile ? uploadFile.name : "Choose a file"}
+                        </span>
                       </label>
-                      <p style={{ fontSize: '12px', color: '#888', margin: '4px 0 0' }}>
-                        Upload and preview {SUPPORTED_UPLOAD_LABEL} files, up to{' '}
+                      <p
+                        style={{
+                          fontSize: "12px",
+                          color: "#888",
+                          margin: "4px 0 0",
+                        }}
+                      >
+                        Upload and preview {SUPPORTED_UPLOAD_LABEL} files, up to{" "}
                         {MAX_UPLOAD_FILE_MB} MB each.
                       </p>
                       <Button
@@ -1034,11 +1155,12 @@ export function WorkspaceModule({
                           {documents.map((document) => (
                             <button
                               className={classNames(
-                                'document-row',
-                                document.id === selectedDocumentId && 'selected',
-                                mode === 'workspace' &&
+                                "document-row",
+                                document.id === selectedDocumentId &&
+                                  "selected",
+                                mode === "workspace" &&
                                   document.id === focusedDocumentId &&
-                                  'focused-activity',
+                                  "focused-activity",
                               )}
                               data-document-id={document.id}
                               key={document.id}
@@ -1051,10 +1173,13 @@ export function WorkspaceModule({
                               <span>
                                 <strong>{document.title}</strong>
                                 <small>
-                                  {document.file_name} uploaded by {document.uploader_name}
+                                  {document.file_name} uploaded by{" "}
+                                  {document.uploader_name}
                                 </small>
                                 {document.ai_summary && (
-                                  <DocumentAiSummary summary={document.ai_summary} />
+                                  <DocumentAiSummary
+                                    summary={document.ai_summary}
+                                  />
                                 )}
                               </span>
                               <DocumentTags document={document} />
@@ -1102,9 +1227,18 @@ export function WorkspaceModule({
                         <p>{qaAnswer.answer}</p>
                         {qaAnswer.sources.length > 0 && (
                           <div className="document-qa-sources">
-                            <span className="document-qa-sources-label">Sources</span>
-                            {[...new Set(qaAnswer.sources.map((s) => s.file_name))].map((fileName) => (
-                              <span className="document-qa-source" key={fileName}>
+                            <span className="document-qa-sources-label">
+                              Sources
+                            </span>
+                            {[
+                              ...new Set(
+                                qaAnswer.sources.map((s) => s.file_name),
+                              ),
+                            ].map((fileName) => (
+                              <span
+                                className="document-qa-source"
+                                key={fileName}
+                              >
                                 {fileName}
                               </span>
                             ))}
@@ -1143,8 +1277,9 @@ export function WorkspaceModule({
                           {documents.map((document) => (
                             <button
                               className={classNames(
-                                'document-row',
-                                document.id === selectedDocumentId && 'selected',
+                                "document-row",
+                                document.id === selectedDocumentId &&
+                                  "selected",
                               )}
                               data-document-id={document.id}
                               key={document.id}
@@ -1154,10 +1289,13 @@ export function WorkspaceModule({
                               <span>
                                 <strong>{document.title}</strong>
                                 <small>
-                                  {document.file_name} uploaded by {document.uploader_name}
+                                  {document.file_name} uploaded by{" "}
+                                  {document.uploader_name}
                                 </small>
                                 {document.ai_summary && (
-                                  <DocumentAiSummary summary={document.ai_summary} />
+                                  <DocumentAiSummary
+                                    summary={document.ai_summary}
+                                  />
                                 )}
                               </span>
                               <DocumentTags document={document} />
@@ -1173,22 +1311,33 @@ export function WorkspaceModule({
                       <>
                         <div className="document-detail-header">
                           <div>
-                            <Tag color="green">{selectedDocument.document_type}</Tag>
+                            <Tag color="green">
+                              {selectedDocument.document_type}
+                            </Tag>
                             <h2>{selectedDocument.title}</h2>
                             <p>
-                              {selectedDocument.file_name} by {selectedDocument.uploader_name}
+                              {selectedDocument.file_name} by{" "}
+                              {selectedDocument.uploader_name}
                             </p>
                           </div>
                           <div className="document-detail-actions">
-                            <span>{formatDate(selectedDocument.uploaded_at)}</span>
-                            <Button onClick={() => setPreviewDocument(selectedDocument)}>
+                            <span>
+                              {formatDate(selectedDocument.uploaded_at)}
+                            </span>
+                            <Button
+                              onClick={() =>
+                                setPreviewDocument(selectedDocument)
+                              }
+                            >
                               Preview file
                             </Button>
                             {selectedDocument.can_delete && (
                               <Button
                                 danger
                                 icon={<Trash size={18} weight="bold" />}
-                                onClick={() => handleDeleteDocument(selectedDocument)}
+                                onClick={() =>
+                                  handleDeleteDocument(selectedDocument)
+                                }
                               >
                                 Delete
                               </Button>
@@ -1206,31 +1355,105 @@ export function WorkspaceModule({
                               <Empty description="No comments yet" />
                             ) : (
                               <div className="comment-list">
-                                {comments.map((comment) => (
-                                  <article
-                                    className={classNames(
-                                      'comment-item',
-                                      comment.id === focusedCommentId &&
-                                        'focused-activity',
-                                    )}
-                                    data-comment-id={comment.id}
-                                    key={comment.id}
-                                    tabIndex={-1}
-                                  >
-                                    <div>
-                                      <strong>{comment.author_name}</strong>
-                                      <span>{formatDate(comment.created_at)}</span>
-                                    </div>
-                                    <p>{comment.content}</p>
-                                  </article>
-                                ))}
+                                {comments.map((comment) => {
+                                  return (
+                                    <article
+                                      className={classNames(
+                                        "comment-item",
+                                        comment.id === focusedCommentId &&
+                                          "focused-activity",
+                                      )}
+                                      data-comment-id={comment.id}
+                                      key={comment.id}
+                                      tabIndex={-1}
+                                    >
+                                      <div className="comment-header">
+                                        <div className="comment-author-info">
+                                          <strong>{comment.author_name}</strong>
+                                          <span className="comment-date">
+                                            {formatDate(comment.created_at)}
+                                          </span>
+                                        </div>
+
+                                        {user?.id === comment.author_id && (
+                                          <div className="comment-buttons">
+                                            <Button
+                                              type="text"
+                                              size="small"
+                                              onClick={() => {
+                                                setEditCommentId(comment.id);
+                                                setEditCommentText(
+                                                  comment.content,
+                                                );
+                                              }}
+                                            >
+                                              <NotePencil size={16} /> Edit
+                                            </Button>
+                                            <Button
+                                              type="text"
+                                              danger
+                                              size="small"
+                                              onClick={() =>
+                                                handleDeleteComment(comment.id)
+                                              }
+                                            >
+                                              <Trash size={16} /> Delete
+                                            </Button>
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {editCommentId === comment.id ? (
+                                        <div style={{ marginTop: "8px" }}>
+                                          <Input.TextArea
+                                            autoSize={{
+                                              minRows: 2,
+                                              maxRows: 5,
+                                            }}
+                                            value={editCommentText}
+                                            onChange={(e) =>
+                                              setEditCommentText(e.target.value)
+                                            }
+                                          />
+                                          <div className="comment-editing-buttons">
+                                            <Button
+                                              type="primary"
+                                              size="small"
+                                              loading={editingComment}
+                                              onClick={() =>
+                                                handleUpdateComment(comment.id)
+                                              }
+                                            >
+                                              Save
+                                            </Button>
+                                            <Button
+                                              size="small"
+                                              onClick={() => {
+                                                setEditCommentId(null);
+                                                setEditCommentText("");
+                                              }}
+                                            >
+                                              Cancel
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <p style={{ marginTop: "8px" }}>
+                                          {comment.content}
+                                        </p>
+                                      )}
+                                    </article>
+                                  );
+                                })}
                               </div>
                             )}
                           </Spin>
                           <div className="comment-composer">
                             <Input.TextArea
                               autoSize={{ minRows: 3, maxRows: 5 }}
-                              onChange={(event) => setCommentText(event.target.value)}
+                              onChange={(event) =>
+                                setCommentText(event.target.value)
+                              }
                               placeholder="Leave a note for your group"
                               value={commentText}
                             />
